@@ -1,0 +1,29 @@
+## Visual Studio / .NET
+.vs/
+bin/
+obj/
+
+## User-specific files
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build and publish output
+Debug/
+Release/
+publish/
+
+## Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+## Local environment / secrets
+.env
+*.local.json
+
+## OS files
+Thumbs.db
+Desktop.ini
