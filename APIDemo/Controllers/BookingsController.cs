@@ -1,5 +1,7 @@
+using APIDemo.Data;
 using APIDemo.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Controllers
 {
@@ -7,56 +9,34 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class BookingsController : ControllerBase
     {
-        private static readonly List<Booking> _bookings = new()
-        {
-            new Booking
-            {
-                Id = 1,
-                UserId = 2,
-                HouseId = 1,
-                StartDate = new DateTime(2026, 9, 10),
-                EndDate = new DateTime(2027, 3, 10),
-                Status = "Pending"
-            },
-            new Booking
-            {
-                Id = 2,
-                UserId = 3,
-                HouseId = 2,
-                StartDate = new DateTime(2026, 10, 1),
-                EndDate = new DateTime(2027, 10, 1),
-                Status = "Approved"
-            },
-            new Booking
-            {
-                Id = 3,
-                UserId = 4,
-                HouseId = 3,
-                StartDate = new DateTime(2026, 11, 15),
-                EndDate = new DateTime(2027, 5, 15),
-                Status = "Cancelled"
-            }
-        };
+        private readonly AppDbContext _context;
 
-        // GET /api/bookings
-        [HttpGet]
-        public IActionResult GetAll([FromQuery] string? status)
+        // Inject AppDbContext kết nối CSDL
+        public BookingsController(AppDbContext context)
         {
-            var bookings = _bookings.AsEnumerable();
+            _context = context;
+        }
+
+        // 1. GET /api/bookings (Lấy danh sách đặt phòng, hỗ trợ lọc theo trạng thái)
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] string? status)
+        {
+            var query = _context.Bookings.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status))
             {
-                bookings = bookings.Where(b => b.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(b => b.Status == status);
             }
 
+            var bookings = await query.ToListAsync();
             return Ok(bookings);
         }
 
-        // GET /api/bookings/1
+        // 2. GET /api/bookings/{id} (Lấy chi tiết 1 lịch đặt phòng)
         [HttpGet("{id:int}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var booking = _bookings.FirstOrDefault(b => b.Id == id);
+            var booking = await _context.Bookings.FindAsync(id);
 
             if (booking is null)
             {
@@ -66,24 +46,20 @@ namespace APIDemo.Controllers
             return Ok(booking);
         }
 
-        // POST /api/bookings
+        // 3. POST /api/bookings (Tạo mới lịch đặt phòng)
         [HttpPost]
-        public IActionResult Create([FromBody] Booking booking)
+        public async Task<IActionResult> Create([FromBody] Booking booking)
         {
             if (booking is null || booking.StartDate >= booking.EndDate)
             {
-                return BadRequest(new { message = "Du lieu khong hop le." });
+                return BadRequest(new { message = "Du lieu khong hop le hoac ngay bat dau phai nho hon ngay ket thuc." });
             }
 
-            booking.Id = _bookings.Any()
-                ? _bookings.Max(b => b.Id) + 1
-                : 1;
+            // Gán trạng thái mặc định nếu để trống
+            booking.Status = string.IsNullOrWhiteSpace(booking.Status) ? "Pending" : booking.Status;
 
-            booking.Status = string.IsNullOrWhiteSpace(booking.Status)
-                ? "Pending"
-                : booking.Status;
-
-            _bookings.Add(booking);
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction(
                 nameof(GetById),
@@ -91,16 +67,16 @@ namespace APIDemo.Controllers
                 booking);
         }
 
-        // PUT /api/bookings/1
+        // 4. PUT /api/bookings/{id} (Cập nhật lịch đặt phòng)
         [HttpPut("{id:int}")]
-        public IActionResult Update(int id, [FromBody] Booking updated)
+        public async Task<IActionResult> Update(int id, [FromBody] Booking updated)
         {
             if (updated.StartDate >= updated.EndDate)
             {
                 return BadRequest(new { message = "Ngay bat dau phai nho hon ngay ket thuc." });
             }
 
-            var booking = _bookings.FirstOrDefault(b => b.Id == id);
+            var booking = await _context.Bookings.FindAsync(id);
 
             if (booking is null)
             {
@@ -111,23 +87,26 @@ namespace APIDemo.Controllers
             booking.HouseId = updated.HouseId;
             booking.StartDate = updated.StartDate;
             booking.EndDate = updated.EndDate;
-            booking.Status = updated.Status;
+            booking.Status = string.IsNullOrWhiteSpace(updated.Status) ? booking.Status : updated.Status;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        // DELETE /api/bookings/1
+        // 5. DELETE /api/bookings/{id} (Xóa lịch đặt phòng)
         [HttpDelete("{id:int}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var booking = _bookings.FirstOrDefault(b => b.Id == id);
+            var booking = await _context.Bookings.FindAsync(id);
 
             if (booking is null)
             {
                 return NotFound(new { message = $"Khong tim thay lich thue nha Id = {id}" });
             }
 
-            _bookings.Remove(booking);
+            _context.Bookings.Remove(booking);
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
