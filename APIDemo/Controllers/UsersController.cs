@@ -1,6 +1,8 @@
+using APIDemo.Data;
 using APIDemo.DTOs;
 using APIDemo.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Controllers
 {
@@ -8,59 +10,34 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class UsersController : ControllerBase
     {
-        private static readonly List<User> _users = new()
-        {
-            new User
-            {
-                Id = 1,
-                Username = "admin",
-                FullName = "Quan tri vien",
-                Email = "admin@gmail.com",
-                Password = "123456",
-                Phone = "0900000001",
-                Role = "Admin"
-            },
-            new User
-            {
-                Id = 2,
-                Username = "tenant01",
-                FullName = "Nguyen Van An",
-                Email = "an@gmail.com",
-                Password = "123456",
-                Phone = "0900000002",
-                Role = "Tenant"
-            },
-            new User
-            {
-                Id = 3,
-                Username = "owner01",
-                FullName = "Tran Thi Binh",
-                Email = "binh@gmail.com",
-                Password = "123456",
-                Phone = "0900000003",
-                Role = "Owner"
-            }
-        };
+        private readonly AppDbContext _context;
 
-        // GET /api/users
-        [HttpGet]
-        public IActionResult GetAll([FromQuery] string? role)
+        // Nhận AppDbContext từ hệ thống để kết nối CSDL SQL Server
+        public UsersController(AppDbContext context)
         {
-            var users = _users.AsEnumerable();
+            _context = context;
+        }
+
+        // 1. Lấy danh sách Users từ SQL Server
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] string? role)
+        {
+            var query = _context.Users.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(role))
             {
-                users = users.Where(u => u.Role.Equals(role, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(u => u.Role == role);
             }
 
+            var users = await query.ToListAsync();
             return Ok(users);
         }
 
-        // GET /api/users/1
+        // 2. Lấy chi tiết 1 User theo Id
         [HttpGet("{id:int}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var user = _users.FirstOrDefault(u => u.Id == id);
+            var user = await _context.Users.FindAsync(id);
 
             if (user is null)
             {
@@ -70,26 +47,23 @@ namespace APIDemo.Controllers
             return Ok(user);
         }
 
-        // POST /api/users
+        // 3. Thêm User mới và lưu vào SQL Server
         [HttpPost]
-        public IActionResult Create([FromBody] UserDto dto)
+        public async Task<IActionResult> Create([FromBody] UserDto dto)
         {
             var user = new User
             {
-                Id = _users.Any()
-                    ? _users.Max(u => u.Id) + 1
-                    : 1,
                 Username = dto.Username,
                 FullName = dto.FullName,
                 Email = dto.Email,
                 Password = dto.Password,
                 Phone = dto.Phone,
-                Role = string.IsNullOrWhiteSpace(dto.Role)
-                    ? "Tenant"
-                    : dto.Role
+                Role = string.IsNullOrWhiteSpace(dto.Role) ? "Tenant" : dto.Role,
+                CreatedAt = DateTime.UtcNow
             };
 
-            _users.Add(user);
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync(); // <-- Lệnh lưu thật vào SQL Server
 
             return CreatedAtAction(
                 nameof(GetById),
@@ -97,11 +71,11 @@ namespace APIDemo.Controllers
                 user);
         }
 
-        // PUT /api/users/1
+        // 4. Cập nhật User trong SQL Server
         [HttpPut("{id:int}")]
-        public IActionResult Update(int id, [FromBody] UserDto dto)
+        public async Task<IActionResult> Update(int id, [FromBody] UserDto dto)
         {
-            var user = _users.FirstOrDefault(u => u.Id == id);
+            var user = await _context.Users.FindAsync(id);
 
             if (user is null)
             {
@@ -113,25 +87,26 @@ namespace APIDemo.Controllers
             user.Email = dto.Email;
             user.Password = dto.Password;
             user.Phone = dto.Phone;
-            user.Role = string.IsNullOrWhiteSpace(dto.Role)
-                ? user.Role
-                : dto.Role;
+            user.Role = string.IsNullOrWhiteSpace(dto.Role) ? user.Role : dto.Role;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        // DELETE /api/users/1
+        // 5. Xóa User khỏi SQL Server
         [HttpDelete("{id:int}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var user = _users.FirstOrDefault(u => u.Id == id);
+            var user = await _context.Users.FindAsync(id);
 
             if (user is null)
             {
                 return NotFound(new { message = $"Khong tim thay nguoi dung Id = {id}" });
             }
 
-            _users.Remove(user);
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
