@@ -1,8 +1,8 @@
-using APIDemo.Data;
 using APIDemo.DTOs;
-using APIDemo.Models;
+using APIDemo.DTOs.Common; // 👈 1. Thêm using này để nhận diện PagedResult và UserQueryParameters
+using APIDemo.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Controllers
 {
@@ -10,105 +10,73 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class UsersController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUserService _userService;
+        private readonly IAuthService _authService;
 
-        // Nhận AppDbContext từ hệ thống để kết nối CSDL SQL Server
-        public UsersController(AppDbContext context)
+        public UsersController(IUserService userService, IAuthService authService)
         {
-            _context = context;
+            _userService = userService;
+            _authService = authService;
         }
 
-        // 1. Lấy danh sách Users từ SQL Server
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] string? role)
+        [Authorize(Roles = "Admin")] // Chỉ tài khoản Role "Admin" mới được lấy danh sách (nếu muốn test nhanh trên Swagger mà không cần đăng nhập Admin thì bạn có thể tạm đóng comment dòng này lại)
+        public async Task<ActionResult<PageResult<UserResponseDto>>> GetAll([FromQuery] UserQueryParameters queryParams)
         {
-            var query = _context.Users.AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(role))
-            {
-                query = query.Where(u => u.Role == role);
-            }
-
-            var users = await query.ToListAsync();
-            return Ok(users);
+            var result = await _userService.GetAllAsync(queryParams);
+            return Ok(result);
         }
 
-        // 2. Lấy chi tiết 1 User theo Id
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<ActionResult<UserResponseDto>> GetById(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nguoi dung Id = {id}" });
-            }
+            var user = await _userService.GetByIdAsync(id);
+            if (user == null)
+                return NotFound(new { message = $"Không tìm thấy người dùng có Id = {id}" });
 
             return Ok(user);
         }
 
-        // 3. Thêm User mới và lưu vào SQL Server
-        [HttpPost]
-        public async Task<IActionResult> Create([FromBody] UserDto dto)
+        [HttpPost("register")]
+        public async Task<ActionResult<UserResponseDto>> Register([FromBody] UserRegisterDto request)
         {
-            var user = new User
-            {
-                Username = dto.Username,
-                FullName = dto.FullName,
-                Email = dto.Email,
-                Password = dto.Password,
-                Phone = dto.Phone,
-                Role = string.IsNullOrWhiteSpace(dto.Role) ? "Tenant" : dto.Role,
-                CreatedAt = DateTime.UtcNow
-            };
+            var result = await _userService.RegisterAsync(request);
+            if (!result.IsSuccess)
+                return BadRequest(new { message = result.Message });
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync(); // <-- Lệnh lưu thật vào SQL Server
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = user.Id },
-                user);
+            return Ok(result.Data);
         }
 
-        // 4. Cập nhật User trong SQL Server
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] UserDto dto)
+        public async Task<IActionResult> Update(int id, [FromBody] UserRegisterDto request)
         {
-            var user = await _context.Users.FindAsync(id);
+            var result = await _userService.UpdateAsync(id, request);
+            if (!result.IsSuccess)
+                return BadRequest(new { message = result.Message });
 
-            if (user is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nguoi dung Id = {id}" });
-            }
-
-            user.Username = dto.Username;
-            user.FullName = dto.FullName;
-            user.Email = dto.Email;
-            user.Password = dto.Password;
-            user.Phone = dto.Phone;
-            user.Role = string.IsNullOrWhiteSpace(dto.Role) ? user.Role : dto.Role;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok(new { message = result.Message });
         }
 
-        // 5. Xóa User khỏi SQL Server
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var result = await _userService.DeleteAsync(id);
+            if (!result.IsSuccess)
+                return NotFound(new { message = result.Message });
 
-            if (user is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nguoi dung Id = {id}" });
-            }
+            return Ok(new { message = result.Message });
+        }
 
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto dto)
+        {
+            var token = await _authService.LoginAsync(dto);
 
-            return NoContent();
+            if (token == null)
+                return Unauthorized(new { message = "Tên đăng nhập hoặc mật khẩu không chính xác." });
+
+            return Ok(new { Token = token });
         }
     }
 }

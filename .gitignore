@@ -19,6 +19,9 @@ publish/
 *.log
 *.tmp
 *.temp
+APIDemo/Logs/*
+!APIDemo/Logs/.gitkeep
+
 
 ## Local environment / secrets
 .env
@@ -27,3 +30,15 @@ publish/
 ## OS files
 Thumbs.db
 Desktop.ini
+
+## Slides & Presentation Documents
+*.pdf
+*.pptx
+*.ppt
+
+## Uploaded Files / Test artifacts
+APIDemo/wwwroot/images/*
+!APIDemo/wwwroot/images/.gitkeep
+test_results.json
+*.ps1
+

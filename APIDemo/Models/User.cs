@@ -24,8 +24,10 @@ namespace APIDemo.Models
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        [MaxLength(100)]
-        public string Password { get; set; } = string.Empty;
+        public byte[] PasswordHash { get; set; } = Array.Empty<byte>();
+
+        [Required]
+        public byte[] PasswordSalt { get; set; } = Array.Empty<byte>();
 
         [Required]
         [MaxLength(15)]
@@ -35,6 +37,11 @@ namespace APIDemo.Models
         [Required]
         [MaxLength(20)]
         public string Role { get; set; } = "Tenant";
+
+        [MaxLength(50)]
+        public string Department { get; set; } = "General";
+
+        public DateTime? DateOfBirth { get; set; }
 
         [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

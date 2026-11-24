@@ -1,7 +1,9 @@
-using APIDemo.Data;
+using APIDemo.DTOs;
+using APIDemo.DTOs.Common;
 using APIDemo.Models;
+using APIDemo.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Controllers
 {
@@ -9,110 +11,63 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class HousesController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IHouseService _houseService;
 
-        // Inject AppDbContext kết nối CSDL
-        public HousesController(AppDbContext context)
+        public HousesController(IHouseService houseService)
         {
-            _context = context;
+            _houseService = houseService;
         }
 
-        // 1. GET /api/houses (Lấy danh sách nhà, có lọc theo trạng thái và giá tối thiểu)
+        // 1. GET /api/houses (Ai cũng xem được - Hỗ trợ Pagination, Filtering, Searching, Sorting)
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] decimal? minPrice)
+        public async Task<ActionResult<PageResult<House>>> GetAll([FromQuery] HouseQueryParameters queryParams)
         {
-            var query = _context.Houses.AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(status))
-            {
-                query = query.Where(h => h.Status == status);
-            }
-
-            if (minPrice.HasValue)
-            {
-                query = query.Where(h => h.Price >= minPrice.Value);
-            }
-
-            var houses = await query.ToListAsync();
-            return Ok(houses);
+            var result = await _houseService.GetAllHousesAsync(queryParams);
+            return Ok(result);
         }
 
-        // 2. GET /api/houses/{id} (Lấy chi tiết nhà theo ID)
+        // 2. GET /api/houses/{id} (Ai cũng xem được)
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var house = await _context.Houses.FindAsync(id);
-
-            if (house is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nha cho thue Id = {id}" });
-            }
+            var house = await _houseService.GetHouseByIdAsync(id);
+            if (house == null)
+                return NotFound(new { message = $"Không tìm thấy nhà cho thuê Id = {id}" });
 
             return Ok(house);
         }
 
-        // 3. POST /api/houses (Thêm nhà mới vào SQL Server)
+        // 3. POST /api/houses (Chỉ Chủ nhà - Owner hoặc Admin mới được đăng nhà)
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] House house)
+        [Authorize(Roles = "Owner,Admin")]
+        public async Task<IActionResult> Create([FromBody] HouseDto dto)
         {
-            if (house is null)
-            {
-                return BadRequest(new { message = "Du lieu khong hop le." });
-            }
-
-            // Gán trạng thái mặc định nếu để trống
-            house.Status = string.IsNullOrWhiteSpace(house.Status) ? "Available" : house.Status;
-
-            _context.Houses.Add(house);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = house.Id },
-                house);
+            var created = await _houseService.CreateHouseAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
-        // 4. PUT /api/houses/{id} (Cập nhật thông tin nhà trong SQL Server)
+        // 4. PUT /api/houses/{id} (Chỉ Chủ nhà - Owner hoặc Admin mới được sửa thông tin nhà)
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] House updated)
+        [Authorize(Roles = "Owner,Admin")]
+        public async Task<IActionResult> Update(int id, [FromBody] HouseDto dto)
         {
-            var house = await _context.Houses.FindAsync(id);
+            var success = await _houseService.UpdateHouseAsync(id, dto);
+            if (!success)
+                return NotFound(new { message = $"Không tìm thấy nhà cho thuê Id = {id}" });
 
-            if (house is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nha cho thue Id = {id}" });
-            }
-
-            house.Title = updated.Title;
-            house.Description = updated.Description;
-            house.Address = updated.Address;
-            house.Price = updated.Price;
-            house.Area = updated.Area;
-            house.Bedrooms = updated.Bedrooms;
-            house.ImageUrl = updated.ImageUrl;
-            house.Status = string.IsNullOrWhiteSpace(updated.Status) ? house.Status : updated.Status;
-            house.OwnerId = updated.OwnerId;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok(new { message = "Cập nhật nhà thành công." });
         }
 
-        // 5. DELETE /api/houses/{id} (Xóa nhà khỏi SQL Server)
+        // 5. DELETE /api/houses/{id} (Chỉ duy nhất Admin mới có quyền xóa nhà)
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
-            var house = await _context.Houses.FindAsync(id);
+            var success = await _houseService.DeleteHouseAsync(id);
+            if (!success)
+                return NotFound(new { message = $"Không tìm thấy nhà cho thuê Id = {id}" });
 
-            if (house is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nha cho thue Id = {id}" });
-            }
-
-            _context.Houses.Remove(house);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok(new { message = "Đã xóa nhà thành công." });
         }
     }
 }
