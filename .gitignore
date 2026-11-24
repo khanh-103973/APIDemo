@@ -54,7 +54,7 @@ Thumbs.db
 Desktop.ini
 
 ## Agent
-agent/
+.agents/
 
 #markdown
 *.md
