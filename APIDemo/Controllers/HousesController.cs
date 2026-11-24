@@ -1,5 +1,8 @@
+using APIDemo.Data;
+using APIDemo.Exceptions;
 using APIDemo.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Controllers
 {
@@ -7,100 +10,57 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class HousesController : ControllerBase
     {
-        private static readonly List<House> _houses = new()
+        private readonly AppDbContext _context;
+
+        public HousesController(AppDbContext context)
         {
-            new House
-            {
-                Id = 1,
-                Title = "Can ho mini gan truong dai hoc",
-                Description = "Phong day du noi that, co bep nho va nha ve sinh rieng.",
-                Address = "Quan 1, TP. Ho Chi Minh",
-                Price = 4500000,
-                Area = 28,
-                Bedrooms = 1,
-                ImageUrl = "https://example.com/house-1.jpg",
-                Status = "Available",
-                OwnerId = 1
-            },
-            new House
-            {
-                Id = 2,
-                Title = "Nha nguyen can 2 phong ngu",
-                Description = "Khu dan cu yen tinh, phu hop gia dinh nho.",
-                Address = "Quan Binh Thanh, TP. Ho Chi Minh",
-                Price = 9000000,
-                Area = 65,
-                Bedrooms = 2,
-                ImageUrl = "https://example.com/house-2.jpg",
-                Status = "Rented",
-                OwnerId = 2
-            },
-            new House
-            {
-                Id = 3,
-                Title = "Phong tro co gac lung",
-                Description = "Phong sach se, co cho de xe va gio giac tu do.",
-                Address = "Quan Go Vap, TP. Ho Chi Minh",
-                Price = 3200000,
-                Area = 22,
-                Bedrooms = 1,
-                ImageUrl = "https://example.com/house-3.jpg",
-                Status = "Available",
-                OwnerId = 1
-            }
-        };
+            _context = context;
+        }
 
         // GET /api/houses
         [HttpGet]
-        public IActionResult GetAll([FromQuery] string? status, [FromQuery] decimal? minPrice)
+        public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] decimal? minPrice)
         {
-            var houses = _houses.AsEnumerable();
+            var query = _context.Houses.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status))
             {
-                houses = houses.Where(h => h.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(h => h.Status.ToLower() == status.ToLower());
             }
 
             if (minPrice.HasValue)
             {
-                houses = houses.Where(h => h.Price >= minPrice.Value);
+                query = query.Where(h => h.Price >= minPrice.Value);
             }
 
+            var houses = await query.ToListAsync();
             return Ok(houses);
         }
 
         // GET /api/houses/1
         [HttpGet("{id:int}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var house = _houses.FirstOrDefault(h => h.Id == id);
-
-            if (house is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nha cho thue Id = {id}" });
-            }
+            var house = await _context.Houses.FindAsync(id)
+                ?? throw new NotFoundException($"Khong tim thay nha cho thue Id = {id}");
 
             return Ok(house);
         }
 
         // POST /api/houses
         [HttpPost]
-        public IActionResult Create([FromBody] House house)
+        public async Task<IActionResult> Create([FromBody] House house)
         {
             if (house is null)
             {
-                return BadRequest(new { message = "Du lieu khong hop le." });
+                throw new BadRequestException("Du lieu khong hop le.");
             }
 
-            house.Id = _houses.Any()
-                ? _houses.Max(h => h.Id) + 1
-                : 1;
+            house.Id = 0;
+            house.Status = string.IsNullOrWhiteSpace(house.Status) ? "Available" : house.Status;
 
-            house.Status = string.IsNullOrWhiteSpace(house.Status)
-                ? "Available"
-                : house.Status;
-
-            _houses.Add(house);
+            _context.Houses.Add(house);
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction(
                 nameof(GetById),
@@ -110,14 +70,10 @@ namespace APIDemo.Controllers
 
         // PUT /api/houses/1
         [HttpPut("{id:int}")]
-        public IActionResult Update(int id, [FromBody] House updated)
+        public async Task<IActionResult> Update(int id, [FromBody] House updated)
         {
-            var house = _houses.FirstOrDefault(h => h.Id == id);
-
-            if (house is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nha cho thue Id = {id}" });
-            }
+            var house = await _context.Houses.FindAsync(id)
+                ?? throw new NotFoundException($"Khong tim thay nha cho thue Id = {id}");
 
             house.Title = updated.Title;
             house.Description = updated.Description;
@@ -129,21 +85,19 @@ namespace APIDemo.Controllers
             house.Status = updated.Status;
             house.OwnerId = updated.OwnerId;
 
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
         // DELETE /api/houses/1
         [HttpDelete("{id:int}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var house = _houses.FirstOrDefault(h => h.Id == id);
+            var house = await _context.Houses.FindAsync(id)
+                ?? throw new NotFoundException($"Khong tim thay nha cho thue Id = {id}");
 
-            if (house is null)
-            {
-                return NotFound(new { message = $"Khong tim thay nha cho thue Id = {id}" });
-            }
-
-            _houses.Remove(house);
+            _context.Houses.Remove(house);
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }

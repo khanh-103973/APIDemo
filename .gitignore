@@ -19,6 +19,9 @@ publish/
 *.log
 *.tmp
 *.temp
+APIDemo/Logs/
+APIDemo/wwwroot/images/
+APIDemo/wwwroot/uploads/
 
 ## Local environment / secrets
 .env

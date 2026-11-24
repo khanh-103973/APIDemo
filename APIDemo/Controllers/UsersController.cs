@@ -1,5 +1,8 @@
+using APIDemo.DTOs.Common;
 using APIDemo.DTOs;
-using APIDemo.Models;
+using APIDemo.Exceptions;
+using APIDemo.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace APIDemo.Controllers
@@ -8,132 +11,82 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class UsersController : ControllerBase
     {
-        private static readonly List<User> _users = new()
+        private readonly IUserService _userService;
+        private readonly IAuthService _authService;
+
+        // Inject IUserService và IAuthService thay vì AppDbContext
+        public UsersController(IUserService userService, IAuthService authService)
         {
-            new User
-            {
-                Id = 1,
-                Username = "admin",
-                FullName = "Quan tri vien",
-                Email = "admin@gmail.com",
-                Password = "123456",
-                Phone = "0900000001",
-                Role = "Admin"
-            },
-            new User
-            {
-                Id = 2,
-                Username = "tenant01",
-                FullName = "Nguyen Van An",
-                Email = "an@gmail.com",
-                Password = "123456",
-                Phone = "0900000002",
-                Role = "Tenant"
-            },
-            new User
-            {
-                Id = 3,
-                Username = "owner01",
-                FullName = "Tran Thi Binh",
-                Email = "binh@gmail.com",
-                Password = "123456",
-                Phone = "0900000003",
-                Role = "Owner"
-            }
-        };
-
-        // GET /api/users
-        [HttpGet]
-        public IActionResult GetAll([FromQuery] string? role)
-        {
-            var users = _users.AsEnumerable();
-
-            if (!string.IsNullOrWhiteSpace(role))
-            {
-                users = users.Where(u => u.Role.Equals(role, StringComparison.OrdinalIgnoreCase));
-            }
-
-            return Ok(users);
+            _userService = userService;
+            _authService = authService;
         }
 
-        // GET /api/users/1
-        [HttpGet("{id:int}")]
-        public IActionResult GetById(int id)
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] UserLoginDto dto)
         {
-            var user = _users.FirstOrDefault(u => u.Id == id);
+            var token = await _authService.LoginAsync(dto);
 
-            if (user is null)
+            if (token == null)
             {
-                return NotFound(new { message = $"Khong tim thay nguoi dung Id = {id}" });
+                throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không chính xác.");
             }
+
+            return Ok(new { Token = token });
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<PagedResult<UserResponseDto>>> GetAll([FromQuery] UserQueryParameters queryParams)
+        {
+            var result = await _userService.GetAllAsync(queryParams);
+            return Ok(result);
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<UserResponseDto>> GetById(int id)
+        {
+            var user = await _userService.GetByIdAsync(id)
+                ?? throw new NotFoundException($"Không tìm thấy người dùng có Id = {id}");
 
             return Ok(user);
         }
 
-        // POST /api/users
-        [HttpPost]
-        public IActionResult Create([FromBody] UserDto dto)
+        [HttpPost("register")]
+        public async Task<ActionResult<UserResponseDto>> Register([FromBody] UserRegisterDto request)
         {
-            var user = new User
+            var result = await _userService.RegisterAsync(request);
+            if (!result.IsSuccess)
             {
-                Id = _users.Any()
-                    ? _users.Max(u => u.Id) + 1
-                    : 1,
-                Username = dto.Username,
-                FullName = dto.FullName,
-                Email = dto.Email,
-                Password = dto.Password,
-                Phone = dto.Phone,
-                Role = string.IsNullOrWhiteSpace(dto.Role)
-                    ? "Tenant"
-                    : dto.Role
-            };
+                throw new BadRequestException(result.Message);
+            }
 
-            _users.Add(user);
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = user.Id },
-                user);
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
         }
 
-        // PUT /api/users/1
+        // 2. Cho phép Role "Manager" truy cập API cập nhật dữ liệu
         [HttpPut("{id:int}")]
-        public IActionResult Update(int id, [FromBody] UserDto dto)
+        [Authorize(Roles = "Manager")]
+        public async Task<IActionResult> Update(int id, [FromBody] UserRegisterDto request)
         {
-            var user = _users.FirstOrDefault(u => u.Id == id);
-
-            if (user is null)
+            var result = await _userService.UpdateAsync(id, request);
+            if (!result.IsSuccess)
             {
-                return NotFound(new { message = $"Khong tim thay nguoi dung Id = {id}" });
+                throw new NotFoundException(result.Message);
             }
 
-            user.Username = dto.Username;
-            user.FullName = dto.FullName;
-            user.Email = dto.Email;
-            user.Password = dto.Password;
-            user.Phone = dto.Phone;
-            user.Role = string.IsNullOrWhiteSpace(dto.Role)
-                ? user.Role
-                : dto.Role;
-
-            return NoContent();
+            return Ok(new { message = result.Message });
         }
 
-        // DELETE /api/users/1
         [HttpDelete("{id:int}")]
-        public IActionResult Delete(int id)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
         {
-            var user = _users.FirstOrDefault(u => u.Id == id);
-
-            if (user is null)
+            var result = await _userService.DeleteAsync(id);
+            if (!result.IsSuccess)
             {
-                return NotFound(new { message = $"Khong tim thay nguoi dung Id = {id}" });
+                throw new NotFoundException(result.Message);
             }
 
-            _users.Remove(user);
-
-            return NoContent();
+            return Ok(new { message = result.Message });
         }
     }
 }
