@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Building,
@@ -21,8 +21,10 @@ import {
   History,
   Home,
   PlusCircle,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMockAuth } from "@/lib/auth/mock-auth";
 
 export interface NavItem {
   title: string;
@@ -51,9 +53,9 @@ const landlordNav: NavItem[] = [
 ];
 
 const tenantNav: NavItem[] = [
+  { title: "Phòng đang thuê", href: "/account/rentals", icon: KeyRound },
   { title: "Tin đã lưu", href: "/account/favorites", icon: Heart },
   { title: "Lịch hẹn xem phòng", href: "/account/viewings", icon: CalendarCheck, badge: "1" },
-  { title: "Phòng đang thuê", href: "/account/rentals", icon: KeyRound },
   { title: "Hợp đồng của tôi", href: "/account/contracts", icon: FileText },
   { title: "Hóa đơn thanh toán", href: "/account/invoices", icon: Receipt, badge: "1" },
   { title: "Báo cáo sự cố", href: "/account/issues", icon: Wrench },
@@ -72,6 +74,13 @@ const adminNav: NavItem[] = [
 
 export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useMockAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
 
   const navItems =
     role === "landlord"
@@ -83,39 +92,52 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const roleTitles = {
     landlord: {
       name: "Khu vực Chủ nhà",
-      tag: "Quản trị vận hành",
-      badgeClass: "bg-purple-100 text-purple-700",
+      tag: "Quản trị vận hành bất động sản",
+      badgeClass: "bg-purple-100 text-purple-700 border-purple-200",
+      accentBg: "bg-primary text-primary-foreground",
+      icon: Building,
     },
     tenant: {
-      name: "Tài khoản Khách thuê",
-      tag: "Dịch vụ phòng thuê",
-      badgeClass: "bg-emerald-100 text-emerald-700",
+      name: "Cổng Khách thuê",
+      tag: "Dịch vụ phòng thuê & tiện ích",
+      badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
+      accentBg: "bg-emerald-600 text-white",
+      icon: KeyRound,
     },
     admin: {
-      name: "Hệ thống Admin",
-      tag: "Quản trị nền tảng",
-      badgeClass: "bg-amber-100 text-amber-800",
+      name: "Trung Tâm Admin",
+      tag: "Quản trị & Giám sát hệ thống",
+      badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
+      accentBg: "bg-slate-900 text-white",
+      icon: ShieldCheck,
     },
   };
 
+  const CurrentRoleIcon = roleTitles[role].icon;
+
   return (
-    <aside className="w-64 shrink-0 border-r border-border bg-surface flex flex-col h-full min-h-[calc(100vh-4rem)]">
+    <aside className="w-64 shrink-0 border-r border-border bg-surface/80 backdrop-blur-xs flex flex-col h-full min-h-[calc(100vh-4rem)]">
       {/* Header Info */}
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border bg-white/50">
         <div className="flex items-center justify-between">
-          <span className="font-heading text-sm font-bold text-foreground">
-            {roleTitles[role].name}
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-slate-100 text-foreground">
+              <CurrentRoleIcon className="h-4 w-4" />
+            </div>
+            <span className="font-heading text-sm font-bold text-foreground">
+              {roleTitles[role].name}
+            </span>
+          </div>
           <span
             className={cn(
-              "px-2 py-0.5 text-[11px] font-semibold rounded-[4px]",
+              "px-2 py-0.5 text-[10px] font-bold rounded-full border",
               roleTitles[role].badgeClass
             )}
           >
             {role.toUpperCase()}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="text-xs text-muted-foreground mt-1.5">
           {roleTitles[role].tag}
         </p>
       </div>
@@ -133,14 +155,19 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                "flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer",
                 isActive
-                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                  : "text-muted-foreground hover:bg-slate-200/60 hover:text-foreground"
+                  ? `${roleTitles[role].accentBg} font-semibold shadow-xs`
+                  : "text-slate-600 hover:bg-slate-100 hover:text-foreground"
               )}
             >
               <div className="flex items-center gap-2.5">
-                <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+                <Icon
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    isActive ? "text-current" : "text-muted-foreground"
+                  )}
+                />
                 <span>{item.title}</span>
               </div>
               {item.badge && (
@@ -148,7 +175,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
                   className={cn(
                     "px-1.5 py-0.5 text-[10px] font-bold rounded-full",
                     isActive
-                      ? "bg-white text-primary"
+                      ? "bg-white text-slate-900"
                       : "bg-warning-subtle text-warning-subtle-foreground border border-warning-border"
                   )}
                 >
@@ -160,37 +187,29 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
         })}
       </nav>
 
-      {/* Footer Switcher */}
-      <div className="p-3 border-t border-border bg-background/50 text-xs text-muted-foreground">
-        <p className="font-medium text-foreground mb-1">Chuyển vai trò thử nghiệm:</p>
-        <div className="grid grid-cols-3 gap-1">
-          <Link
-            href="/account/favorites"
-            className={cn(
-              "px-1.5 py-1 text-center rounded border",
-              role === "tenant" ? "bg-muted font-bold text-foreground border-slate-300" : "hover:bg-muted"
-            )}
+      {/* Authenticated User Session Info & Logout */}
+      <div className="p-3 border-t border-border bg-white/70">
+        <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="h-8 w-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs shrink-0">
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : "HR"}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-foreground truncate">
+                {user?.name || "Tài khoản"}
+              </p>
+              <p className="text-[10px] text-muted-foreground truncate">
+                {user?.email || "chưa xác định"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0"
+            title="Đăng xuất tài khoản"
           >
-            Khách
-          </Link>
-          <Link
-            href="/dashboard"
-            className={cn(
-              "px-1.5 py-1 text-center rounded border",
-              role === "landlord" ? "bg-muted font-bold text-foreground border-slate-300" : "hover:bg-muted"
-            )}
-          >
-            Chủ nhà
-          </Link>
-          <Link
-            href="/admin"
-            className={cn(
-              "px-1.5 py-1 text-center rounded border",
-              role === "admin" ? "bg-muted font-bold text-foreground border-slate-300" : "hover:bg-muted"
-            )}
-          >
-            Admin
-          </Link>
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </aside>

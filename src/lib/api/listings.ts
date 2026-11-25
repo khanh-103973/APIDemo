@@ -1,13 +1,35 @@
 import { Listing, ListingFilterParams } from "@/types";
 import { mockListings } from "@/mocks/listings";
 
+export const STORAGE_KEY_LISTINGS = "house_rental_listings";
+
+export function getRawListings(): Listing[] {
+  if (typeof window === "undefined") return mockListings;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LISTINGS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(mockListings));
+  } catch {}
+  return mockListings;
+}
+
 export async function getListings(
   filters?: ListingFilterParams
 ): Promise<Listing[]> {
   // Simulate network latency (20ms) for realistic async behavior
   await new Promise((resolve) => setTimeout(resolve, 20));
 
-  let results = [...mockListings];
+  const all = getRawListings();
+
+  // Public Marketplace Security Guard: ONLY active and approved listings are public
+  let results = all.filter(
+    (l) => l.status === "active" && (!l.moderationStatus || l.moderationStatus === "approved")
+  );
 
   if (!filters) return results;
 
@@ -46,6 +68,12 @@ export async function getListings(
     results = results.filter((l) => l.bedrooms >= (filters.bedrooms ?? 0));
   }
 
+  if (filters.amenities && filters.amenities.length > 0) {
+    results = results.filter((l) =>
+      filters.amenities!.every((a) => l.amenities.includes(a))
+    );
+  }
+
   if (filters.sortBy) {
     switch (filters.sortBy) {
       case "price_asc":
@@ -69,10 +97,17 @@ export async function getListings(
 
 export async function getListingById(id: string): Promise<Listing | null> {
   await new Promise((resolve) => setTimeout(resolve, 15));
-  return mockListings.find((l) => l.id === id) || null;
+  const all = getRawListings();
+  return all.find((l) => l.id === id) || null;
 }
 
 export async function getFeaturedListings(): Promise<Listing[]> {
   await new Promise((resolve) => setTimeout(resolve, 15));
-  return mockListings.filter((l) => l.isFeatured && l.status === "active");
+  const all = getRawListings();
+  return all.filter(
+    (l) =>
+      l.isFeatured &&
+      l.status === "active" &&
+      (!l.moderationStatus || l.moderationStatus === "approved")
+  );
 }

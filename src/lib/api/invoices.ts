@@ -1,13 +1,40 @@
-import { Invoice } from "@/types";
+"use client";
+
+import { Invoice, PaymentRecord } from "@/types";
 import { mockInvoices } from "@/mocks/invoices";
+
+export const STORAGE_KEY_INVOICES = "house_rental_invoices";
+
+export function getAllInvoices(): Invoice[] {
+  if (typeof window === "undefined") return mockInvoices;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_INVOICES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    localStorage.setItem(STORAGE_KEY_INVOICES, JSON.stringify(mockInvoices));
+  } catch {}
+  return mockInvoices;
+}
+
+export function saveAllInvoices(invoices: Invoice[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY_INVOICES, JSON.stringify(invoices));
+    window.dispatchEvent(new Event("house_rental_invoices_change"));
+  } catch {}
+}
 
 export async function getInvoices(params?: {
   landlordId?: string;
   tenantId?: string;
   contractId?: string;
 }): Promise<Invoice[]> {
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  let results = [...mockInvoices];
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  let results = getAllInvoices();
   if (params?.landlordId) {
     results = results.filter((i) => i.landlordId === params.landlordId);
   }
@@ -22,5 +49,6 @@ export async function getInvoices(params?: {
 
 export async function getInvoiceById(id: string): Promise<Invoice | null> {
   await new Promise((resolve) => setTimeout(resolve, 15));
-  return mockInvoices.find((i) => i.id === id) || null;
+  const all = getAllInvoices();
+  return all.find((i) => i.id === id) || null;
 }

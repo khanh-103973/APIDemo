@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { MapPin, Heart, ShieldCheck, Bed, Bath, Maximize2 } from "lucide-react";
+import { MapPin, Heart, ShieldCheck, Bed, Bath, Maximize2, Camera } from "lucide-react";
 import { Listing } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -77,6 +77,12 @@ export function ListingCard({
               >
                 <Heart className={cn("h-4 w-4", favorite && "fill-current")} />
               </button>
+              {listing.images.length > 1 && (
+                <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-[10px] font-medium text-white flex items-center gap-1">
+                  <Camera className="h-3 w-3" />
+                  <span>{listing.images.length}</span>
+                </div>
+              )}
             </div>
 
             {/* Content Details */}
@@ -164,6 +170,12 @@ export function ListingCard({
           >
             <Heart className={cn("h-4 w-4", favorite && "fill-current")} />
           </button>
+          {listing.images.length > 1 && (
+            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-[10px] font-medium text-white flex items-center gap-1">
+              <Camera className="h-3 w-3" />
+              <span>{listing.images.length}</span>
+            </div>
+          )}
         </div>
 
         <CardContent className="p-4 flex-1 flex flex-col justify-between space-y-3">

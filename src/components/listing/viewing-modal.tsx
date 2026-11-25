@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { createViewingRequest } from "@/lib/api/viewings";
+import { useMockAuth } from "@/lib/auth/mock-auth";
 
 export interface ViewingModalProps {
   listing: Listing;
@@ -30,6 +32,7 @@ const timeSlotOptions = [
 ];
 
 export function ViewingModal({ listing, open, onOpenChange }: ViewingModalProps) {
+  const { user } = useMockAuth();
   // Default date to tomorrow in YYYY-MM-DD for native input
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -45,11 +48,19 @@ export function ViewingModal({ listing, open, onOpenChange }: ViewingModalProps)
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API request delay
     setTimeout(() => {
+      const preferredDate = date.split("-").reverse().join("/");
+      createViewingRequest({
+        listingId: listing.id,
+        tenantId: user?.id || "usr_tenant_1",
+        landlordId: listing.landlordId,
+        preferredDate,
+        preferredTimeSlot: timeSlot,
+        tenantNote: note.trim(),
+      });
       setIsSubmitting(false);
       setIsSuccess(true);
-    }, 600);
+    }, 400);
   };
 
   const handleReset = () => {

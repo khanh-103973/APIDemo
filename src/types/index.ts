@@ -20,8 +20,10 @@ export type LandlordVerificationStatus =
 export interface User {
   id: string;
   name: string;
+  fullName?: string;
   email: string;
   phone: string;
+  phoneNumber?: string;
   avatar?: string;
   role: UserRole;
   status: UserStatus;
@@ -294,6 +296,13 @@ export type IssueStatus =
 
 export type IssueUrgency = "low" | "medium" | "high" | "critical";
 
+export type IssueCategory =
+  | "plumbing"
+  | "electrical"
+  | "appliance"
+  | "structural"
+  | "other";
+
 export interface IssueReport {
   id: string;
   tenantId: string;
@@ -302,7 +311,7 @@ export interface IssueReport {
   roomId?: string;
   title: string;
   description: string;
-  category: "plumbing" | "electrical" | "appliance" | "structural" | "other";
+  category: IssueCategory;
   urgency: IssueUrgency;
   status: IssueStatus;
   images: string[];

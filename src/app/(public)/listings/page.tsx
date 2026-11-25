@@ -7,8 +7,12 @@ import {
   Map as MapIcon,
   SlidersHorizontal,
   Home,
+  Sparkles,
+  Building,
+  KeyRound,
+  RotateCcw,
 } from "lucide-react";
-import { Listing, ListingFilterParams } from "@/types";
+import { Listing, ListingFilterParams, PropertyType } from "@/types";
 import { getListings } from "@/lib/api/listings";
 import { ListingCard } from "@/components/listing/listing-card";
 import { SearchFilters } from "@/components/listing/search-filters";
@@ -18,6 +22,14 @@ import { Select } from "@/components/ui/select";
 import { Sheet } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const quickTypes = [
+  { id: "", label: "Tất cả" },
+  { id: "boarding_house", label: "Phòng trọ" },
+  { id: "studio", label: "Studio dịch vụ" },
+  { id: "apartment", label: "Căn hộ chung cư" },
+  { id: "house", label: "Nhà nguyên căn" },
+];
 
 export default function ListingsPage() {
   const [listings, setListings] = React.useState<Listing[]>([]);
@@ -66,16 +78,46 @@ export default function ListingsPage() {
             <span>/</span>
             <span className="font-semibold text-foreground">Danh sách phòng cho thuê</span>
           </div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
-            Khám phá phòng trọ & căn hộ cho thuê
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Minh bạch chi phí, hợp đồng rõ ràng, kết nối trực tiếp với chủ nhà uy tín.
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">
+                Khám phá phòng trọ & căn hộ cho thuê
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Minh bạch chi phí, thông tin thực tế 100%, kết nối trực tiếp với chủ nhà uy tín.
+              </p>
+            </div>
+
+            {/* Quick Type Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {quickTypes.map((type) => {
+                const isActive = (filters.propertyType || "") === type.id;
+                return (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() =>
+                      setFilters({
+                        ...filters,
+                        propertyType: (type.id as PropertyType) || undefined,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      isActive
+                        ? "bg-primary text-white shadow-xs"
+                        : "bg-white border border-slate-200 text-slate-600 hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {type.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Filter Desktop Bar */}
-        <div className="bg-card rounded-lg border border-border p-4 mb-6 shadow-xs hidden md:block">
+        <div className="glass-card rounded-2xl p-5 mb-6 shadow-sm border border-slate-200 hidden md:block">
           <SearchFilters
             filters={filters}
             onFilterChange={setFilters}
@@ -118,7 +160,7 @@ export default function ListingsPage() {
                 <strong className="text-foreground font-semibold">
                   {listings.length}
                 </strong>{" "}
-                kết quả phù hợp
+                phòng cho thuê phù hợp
               </span>
             )}
           </div>
@@ -141,11 +183,11 @@ export default function ListingsPage() {
             </div>
 
             {/* View Mode Toggle Buttons */}
-            <div className="inline-flex rounded-md border border-border bg-card p-0.5">
+            <div className="inline-flex rounded-lg border border-border bg-card p-0.5 shadow-xs">
               <button
                 type="button"
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded text-xs font-medium cursor-pointer transition-colors ${
+                className={`p-2 rounded-md text-xs font-medium cursor-pointer transition-colors ${
                   viewMode === "grid"
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -157,7 +199,7 @@ export default function ListingsPage() {
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded text-xs font-medium cursor-pointer transition-colors ${
+                className={`p-2 rounded-md text-xs font-medium cursor-pointer transition-colors ${
                   viewMode === "list"
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -169,7 +211,7 @@ export default function ListingsPage() {
               <button
                 type="button"
                 onClick={() => setViewMode("map")}
-                className={`p-1.5 rounded text-xs font-medium cursor-pointer transition-colors ${
+                className={`p-2 rounded-md text-xs font-medium cursor-pointer transition-colors ${
                   viewMode === "map"
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -186,8 +228,8 @@ export default function ListingsPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="rounded-lg border border-border bg-card p-4 space-y-3">
-                <Skeleton className="aspect-16/10 w-full rounded-md" />
+              <div key={n} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                <Skeleton className="aspect-16/10 w-full rounded-lg" />
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-5 w-full" />
                 <Skeleton className="h-4 w-3/4" />
@@ -198,8 +240,8 @@ export default function ListingsPage() {
           <EmptyState
             icon={Home}
             title="Không tìm thấy phòng thuê phù hợp"
-            description="Hãy thử thay đổi từ khóa tìm kiếm, mở rộng mức giá hoặc xóa bớt các tiêu chí lọc."
-            actionLabel="Xóa bộ lọc tìm kiếm"
+            description="Hãy thử bỏ bớt điều kiện lọc hoặc tìm kiếm theo khu vực / mức giá khác."
+            actionLabel="Xóa toàn bộ bộ lọc"
             onAction={handleResetFilters}
           />
         ) : viewMode === "map" ? (
@@ -207,43 +249,41 @@ export default function ListingsPage() {
         ) : viewMode === "list" ? (
           <div className="space-y-4">
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} layout="list" />
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                layout="list"
+              />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} layout="grid" />
+              <ListingCard key={listing.id} listing={listing} />
             ))}
           </div>
         )}
       </div>
 
-      {/* Mobile Filters Drawer */}
+      {/* Mobile Filter Sheet */}
       <Sheet
         open={mobileFilterOpen}
         onOpenChange={setMobileFilterOpen}
         side="bottom"
-        title="Bộ lọc tìm kiếm"
+        title="Bộ lọc tìm kiếm phòng thuê"
       >
-        <SearchFilters
-          filters={filters}
-          onFilterChange={(newFilters) => {
-            setFilters(newFilters);
-          }}
-          onReset={() => {
-            handleResetFilters();
-            setMobileFilterOpen(false);
-          }}
-        />
-        <div className="mt-6 pt-4 border-t border-border">
-          <Button
-            variant="primary"
-            className="w-full"
-            onClick={() => setMobileFilterOpen(false)}
-          >
-            Áp dụng bộ lọc
-          </Button>
+        <div className="py-2">
+          <SearchFilters
+            filters={filters}
+            onFilterChange={(newFilters) => {
+              setFilters(newFilters);
+              setMobileFilterOpen(false);
+            }}
+            onReset={() => {
+              handleResetFilters();
+              setMobileFilterOpen(false);
+            }}
+          />
         </div>
       </Sheet>
     </div>
