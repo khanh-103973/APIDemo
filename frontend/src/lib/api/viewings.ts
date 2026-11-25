@@ -2,11 +2,15 @@
 
 import { ViewingRequest, ViewingStatus } from "@/types";
 import { mockViewingRequests } from "@/mocks/viewings";
-import { apiRequest, getAuthToken } from "@/lib/api/client";
+import {
+  apiRequest,
+  extractApiErrorMessage,
+  getAuthToken,
+} from "@/lib/api/client";
 
 export const STORAGE_KEY_VIEWINGS = "house_rental_viewings";
 
-interface BackendBooking {
+export interface BackendBooking {
   id: number;
   userId: number;
   houseId: number;
@@ -22,6 +26,13 @@ function mapBookingStatus(status?: string): ViewingStatus {
   if (s === "completed") return "completed";
   if (s === "rejected") return "rejected";
   return "pending";
+}
+
+function mapViewingStatusToBackend(status: ViewingStatus): string {
+  if (status === "confirmed") return "Approved";
+  if (status === "completed") return "Completed";
+  if (status === "cancelled" || status === "rejected") return "Cancelled";
+  return "Pending";
 }
 
 function mapBookingToViewing(b: BackendBooking): ViewingRequest {
@@ -75,21 +86,22 @@ export async function getViewingRequests(params?: {
   tenantId?: string;
   listingId?: string;
 }): Promise<ViewingRequest[]> {
-  try {
-    const apiBookings = await apiRequest<BackendBooking[]>("/bookings");
-    if (Array.isArray(apiBookings) && apiBookings.length > 0) {
-      let mapped = apiBookings.map(mapBookingToViewing);
-      if (params?.tenantId) {
-        const filtered = mapped.filter((v) => v.tenantId === params.tenantId);
-        if (filtered.length > 0) mapped = filtered;
+  if (getAuthToken()) {
+    try {
+      const apiBookings = await apiRequest<BackendBooking[]>("/bookings");
+      if (Array.isArray(apiBookings)) {
+        let mapped = apiBookings.map(mapBookingToViewing);
+        if (params?.tenantId) {
+          mapped = mapped.filter((v) => v.tenantId === params.tenantId);
+        }
+        if (params?.listingId) {
+          mapped = mapped.filter((v) => v.listingId === params.listingId);
+        }
+        return mapped;
       }
-      if (params?.listingId) {
-        mapped = mapped.filter((v) => v.listingId === params.listingId);
-      }
-      return mapped;
+    } catch {
+      // Fallback to localStorage/mock only if API is unreachable
     }
-  } catch {
-    // Fallback to localStorage/mock
   }
 
   let results = getAllViewings();
@@ -103,6 +115,72 @@ export async function getViewingRequests(params?: {
     results = results.filter((v) => v.listingId === params.listingId);
   }
   return results;
+}
+
+export async function createViewingRequestAsync(data: {
+  listingId: string;
+  tenantId: string;
+  landlordId: string;
+  preferredDate: string;
+  dateIso?: string;
+  preferredTimeSlot: string;
+  tenantNote?: string;
+}): Promise<{ success: boolean; viewing?: ViewingRequest; viaApi?: boolean; error?: string }> {
+  const numericUserId = Number(data.tenantId);
+  const numericHouseId = Number(data.listingId.replace("house_", ""));
+
+  if (getAuthToken()) {
+    if (!Number.isInteger(numericHouseId) || numericHouseId <= 0) {
+      return {
+        success: false,
+        error: "Tin đăng này không thuộc hệ thống dữ liệu SQL Server. Vui lòng chọn phòng thật tại Đà Nẵng.",
+      };
+    }
+
+    const parsedStart = data.dateIso ? new Date(`${data.dateIso}T09:00:00`) : new Date();
+    const startDate = Number.isNaN(parsedStart.getTime()) ? new Date() : parsedStart;
+    if (startDate.getTime() <= Date.now()) {
+      startDate.setDate(startDate.getDate() + 1);
+    }
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 6);
+
+    try {
+      const created = await apiRequest<BackendBooking>("/bookings", {
+        method: "POST",
+        body: JSON.stringify({
+          userId: Number.isInteger(numericUserId) && numericUserId > 0 ? numericUserId : 1,
+          houseId: numericHouseId,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        }),
+      });
+
+      const mapped = mapBookingToViewing(created);
+      mapped.preferredDate = data.preferredDate || mapped.preferredDate;
+      mapped.preferredTimeSlot = data.preferredTimeSlot;
+      if (data.tenantNote) {
+        mapped.tenantNote = data.tenantNote;
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("house_rental_viewings_change"));
+      }
+      return { success: true, viewing: mapped, viaApi: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: extractApiErrorMessage(
+          err,
+          "Không thể gửi lịch hẹn tới Backend API. Vui lòng kiểm tra server đang chạy."
+        ),
+      };
+    }
+  }
+
+  return {
+    success: false,
+    error: "Vui lòng đăng nhập tài khoản trước khi đặt lịch xem phòng.",
+  };
 }
 
 export function createViewingRequest(data: {
@@ -136,34 +214,48 @@ export function createViewingRequest(data: {
 
   const updated = [newViewing, ...current];
   saveAllViewings(updated);
+  return newViewing;
+}
 
-  // Best-effort sync with real ASP.NET Core /api/bookings when authenticated with JWT
-  const numericUserId = Number(data.tenantId);
-  const numericHouseId = Number(data.listingId.replace("house_", ""));
-  if (
-    getAuthToken() &&
-    Number.isInteger(numericUserId) &&
-    numericUserId > 0 &&
-    Number.isInteger(numericHouseId) &&
-    numericHouseId > 0
-  ) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() + 1);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 6);
+export async function updateViewingStatusAsync(
+  viewing: ViewingRequest,
+  status: ViewingStatus
+): Promise<{ success: boolean; error?: string }> {
+  const numericBookingId = Number(viewing.id.replace("bk_", ""));
+  if (getAuthToken() && Number.isInteger(numericBookingId) && numericBookingId > 0) {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() + 1);
+      const endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + 6);
 
-    void apiRequest("/bookings", {
-      method: "POST",
-      body: JSON.stringify({
-        userId: numericUserId,
-        houseId: numericHouseId,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      }),
-    }).catch(() => {});
+      await apiRequest(`/bookings/${numericBookingId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          userId: Number(viewing.tenantId) || 1,
+          houseId: Number(viewing.listingId.replace("house_", "")) || 1,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          status: mapViewingStatusToBackend(status),
+        }),
+      });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("house_rental_viewings_change"));
+      }
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: extractApiErrorMessage(
+          err,
+          "Không thể cập nhật trạng thái lịch hẹn lên máy chủ."
+        ),
+      };
+    }
   }
 
-  return newViewing;
+  updateViewingStatus(viewing.id, status);
+  return { success: true };
 }
 
 export function updateViewingStatus(

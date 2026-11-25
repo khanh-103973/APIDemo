@@ -43,6 +43,8 @@ namespace APIDemo.Models
 
         public DateTime? DateOfBirth { get; set; }
 
+        public bool IsActive { get; set; } = true;
+
         [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -51,5 +53,8 @@ namespace APIDemo.Models
 
         [JsonIgnore]
         public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+
+        [JsonIgnore]
+        public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     }
 }

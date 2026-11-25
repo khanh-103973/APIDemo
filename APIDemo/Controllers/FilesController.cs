@@ -1,8 +1,8 @@
 using APIDemo.Exceptions;
 using APIDemo.Models;
+using APIDemo.Security;
 using APIDemo.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using static APIDemo.DTOs.FileUploadDbDto;
@@ -14,30 +14,33 @@ namespace APIDemo.Controllers
     [Authorize]
     public class FilesController : ControllerBase
     {
+        private const int MaxMultipleUploadFiles = 10;
+
         private readonly IFileService _fileService;
+        private readonly IImageStorageService _imageStorage;
         private readonly FileSettings _fileSettings;
         private readonly IWebHostEnvironment _environment;
 
         public FilesController(
             IFileService fileService,
+            IImageStorageService imageStorage,
             IOptions<FileSettings> fileSettings,
             IWebHostEnvironment environment)
         {
             _fileService = fileService;
+            _imageStorage = imageStorage;
             _fileSettings = fileSettings.Value;
             _environment = environment;
         }
 
-        // ==========================================
-        // 1. Upload ảnh nhà cho thuê vào wwwroot/images (Phục vụ trực tiếp cho Frontend)
-        // ==========================================
         /// <summary>
-        /// Upload ảnh nhà cho thuê vào thư mục wwwroot/images. Kiểm tra định dạng (.jpg, .jpeg, .png) và kích thước (Options Pattern).
+        /// Upload ảnh nhà cho thuê qua IImageStorageService. Kiểm tra đuôi file, kích thước và Magic Bytes (JPEG/PNG).
         /// </summary>
         [HttpPost("upload-image")]
         [Authorize(Roles = "Admin,Owner,Manager")]
+        [RequestSizeLimit(4_194_304)] // 4 MB
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UploadImage(IFormFile? file)
+        public async Task<IActionResult> UploadImage(IFormFile? file, CancellationToken cancellationToken)
         {
             if (file == null || file.Length == 0)
             {
@@ -58,46 +61,42 @@ namespace APIDemo.Controllers
                     $"Kích thước file vượt quá giới hạn cho phép ({maxMb}MB). Kích thước file của bạn: {file.Length / 1024} KB.");
             }
 
-            var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
-            var imagesFolder = Path.Combine(webRoot, "images");
-            if (!Directory.Exists(imagesFolder))
+            if (!await ImageFileValidator.HasValidImageMagicBytesAsync(file, extension))
             {
-                Directory.CreateDirectory(imagesFolder);
+                throw new BadRequestException(
+                    "File ảnh không hợp lệ (chữ ký nhị phân Magic Bytes không khớp chuẩn JPEG/PNG).");
             }
 
-            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-            var filePath = Path.Combine(imagesFolder, uniqueFileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
+            var (savedFileName, publicUrl) = await _imageStorage.SaveImageAsync(file, extension, cancellationToken);
 
             return Ok(new
             {
                 message = "Tải ảnh lên thành công.",
-                originalFileName = file.FileName,
-                savedFileName = uniqueFileName,
-                url = $"/images/{uniqueFileName}",
+                originalFileName = Path.GetFileName(file.FileName),
+                savedFileName,
+                url = publicUrl,
                 size = file.Length,
                 uploadedAt = DateTime.UtcNow
             });
         }
 
-        // ==========================================
-        // 2. Upload nhiều ảnh cùng lúc cho bộ sưu tập nhà thuê
-        // ==========================================
         /// <summary>
-        /// Upload nhiều file ảnh cùng lúc cho bộ sưu tập phòng/nhà (List&lt;IFormFile&gt;).
+        /// Upload nhiều ảnh cùng lúc (tối đa 10 ảnh, tổng tối đa 15MB), kiểm tra Magic Bytes từng ảnh.
         /// </summary>
         [HttpPost("upload-multiple")]
         [Authorize(Roles = "Admin,Owner,Manager")]
+        [RequestSizeLimit(15_728_640)] // 15 MB
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UploadMultiple(List<IFormFile>? files)
+        public async Task<IActionResult> UploadMultiple(List<IFormFile>? files, CancellationToken cancellationToken)
         {
             if (files == null || files.Count == 0)
             {
                 throw new BadRequestException("Vui lòng chọn ít nhất 1 file ảnh để tải lên.");
+            }
+
+            if (files.Count > MaxMultipleUploadFiles)
+            {
+                throw new BadRequestException($"Chỉ được tải lên tối đa {MaxMultipleUploadFiles} ảnh trong một lần.");
             }
 
             foreach (var file in files)
@@ -120,13 +119,12 @@ namespace APIDemo.Controllers
                     throw new BadRequestException(
                         $"File '{file.FileName}' vượt quá dung lượng tối đa ({maxMb}MB).");
                 }
-            }
 
-            var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
-            var imagesFolder = Path.Combine(webRoot, "images");
-            if (!Directory.Exists(imagesFolder))
-            {
-                Directory.CreateDirectory(imagesFolder);
+                if (!await ImageFileValidator.HasValidImageMagicBytesAsync(file, ext))
+                {
+                    throw new BadRequestException(
+                        $"File '{file.FileName}' không hợp lệ (chữ ký nhị phân không phải JPEG/PNG).");
+                }
             }
 
             var uploadedList = new List<object>();
@@ -134,19 +132,13 @@ namespace APIDemo.Controllers
             foreach (var file in files)
             {
                 var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                var uniqueFileName = $"{Guid.NewGuid()}{ext}";
-                var filePath = Path.Combine(imagesFolder, uniqueFileName);
-
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
+                var (savedFileName, publicUrl) = await _imageStorage.SaveImageAsync(file, ext, cancellationToken);
 
                 uploadedList.Add(new
                 {
-                    originalFileName = file.FileName,
-                    savedFileName = uniqueFileName,
-                    url = $"/images/{uniqueFileName}",
+                    originalFileName = Path.GetFileName(file.FileName),
+                    savedFileName,
+                    url = publicUrl,
                     size = file.Length
                 });
             }
@@ -159,9 +151,6 @@ namespace APIDemo.Controllers
             });
         }
 
-        // ==========================================
-        // 3. API đọc thông tin môi trường chạy (Buổi 10)
-        // ==========================================
         [HttpGet("environment")]
         [Authorize(Roles = "Admin")]
         public IActionResult GetEnvironment()
@@ -176,14 +165,12 @@ namespace APIDemo.Controllers
             });
         }
 
-        // ==========================================
-        // 4. Upload & Download file nhị phân vào Database
-        // ==========================================
         [HttpPost("upload")]
+        [RequestSizeLimit(6_291_456)] // 6 MB
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload([FromForm] UploadFileDto dto)
         {
-            var result = await _fileService.UploadFileAsync(dto.File);
+            var result = await _fileService.UploadFileAsync(dto.File, User.GetUserId());
             return Ok(result);
         }
 
@@ -191,7 +178,7 @@ namespace APIDemo.Controllers
         [HttpGet("download/{id:int}")]
         public async Task<IActionResult> Download(int id)
         {
-            var fileDto = await _fileService.GetFileForDownloadAsync(id);
+            var fileDto = await _fileService.GetFileForDownloadAsync(id, User.GetUserId(), User.IsAdmin());
 
             if (fileDto == null)
             {

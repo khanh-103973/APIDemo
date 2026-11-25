@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,8 +14,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ViewingRequest, Listing } from "@/types";
-import { getMockTenantViewings, cancelMockViewing, getMockCurrentUser } from "@/lib/auth/mock-auth";
-import { getViewingRequests } from "@/lib/api/viewings";
+import { getMockCurrentUser } from "@/lib/auth/mock-auth";
+import { getViewingRequests, updateViewingStatusAsync } from "@/lib/api/viewings";
 import { fetchAllHousesFromApi } from "@/lib/api/listings";
 import { mockListings } from "@/mocks/listings";
 import { getAllListingsFromStorage } from "@/lib/api/landlord";
@@ -33,19 +34,35 @@ import {
 export default function TenantViewingsPage() {
   const router = useRouter();
   const [viewings, setViewings] = React.useState<ViewingRequest[]>([]);
+  const [listings, setListings] = React.useState<Listing[]>([]);
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [cancelTargetId, setCancelTargetId] = React.useState<string | null>(null);
 
+  const refreshViewings = React.useCallback(async () => {
+    const current = getMockCurrentUser();
+    const [houses, bookingList] = await Promise.all([
+      fetchAllHousesFromApi(),
+      getViewingRequests({ tenantId: current?.id }),
+    ]);
+    if (houses) setListings(houses);
+    setViewings(bookingList);
+  }, []);
+
   React.useEffect(() => {
     let active = true;
-    const current = getMockCurrentUser();
-    setViewings(getMockTenantViewings());
-    void fetchAllHousesFromApi();
-    void getViewingRequests({ tenantId: current?.id }).then((data) => {
-      if (active && data.length > 0) setViewings(data);
-    });
+    const sync = async () => {
+      const current = getMockCurrentUser();
+      const [houses, bookingList] = await Promise.all([
+        fetchAllHousesFromApi(),
+        getViewingRequests({ tenantId: current?.id }),
+      ]);
+      if (!active) return;
+      if (houses) setListings(houses);
+      setViewings(bookingList);
+    };
+    void sync();
     const handleSync = () => {
-      setViewings(getMockTenantViewings());
+      void sync();
     };
     window.addEventListener("house_rental_viewings_change", handleSync);
     return () => {
@@ -54,10 +71,13 @@ export default function TenantViewingsPage() {
     };
   }, []);
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     if (!cancelTargetId) return;
-    const updated = cancelMockViewing(cancelTargetId);
-    setViewings(updated);
+    const target = viewings.find((v) => v.id === cancelTargetId);
+    if (target) {
+      await updateViewingStatusAsync(target, "cancelled");
+      await refreshViewings();
+    }
     setCancelTargetId(null);
   };
 
@@ -68,6 +88,7 @@ export default function TenantViewingsPage() {
 
   const getListing = (listingId: string): Listing | undefined => {
     return (
+      listings.find((l) => l.id === listingId) ||
       getAllListingsFromStorage().find((l) => l.id === listingId) ||
       mockListings.find((l) => l.id === listingId)
     );
@@ -118,7 +139,7 @@ export default function TenantViewingsPage() {
               key={tab.value}
               type="button"
               onClick={() => setActiveTab(tab.value)}
-              className={`px-3 py-2 text-xs font-semibold rounded-t-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-2 text-xs font-semibold rounded-t-md transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 isActive
                   ? "bg-card text-primary border-b-2 border-primary"
                   : "text-muted-foreground hover:text-foreground"
@@ -162,14 +183,15 @@ export default function TenantViewingsPage() {
               <Card key={viewing.id} className="overflow-hidden">
                 <div className="p-5 flex flex-col sm:flex-row gap-5 justify-between">
                   {/* Left: Thumbnail & Listing Info */}
-                  <div className="flex gap-4">
+                  <div className="flex flex-col xs:flex-row sm:flex-row gap-4 min-w-0 flex-1">
                     {listing && (
-                      <div className="h-20 w-24 sm:h-24 sm:w-32 rounded-md overflow-hidden bg-muted shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                      <div className="relative h-36 w-full sm:h-24 sm:w-32 rounded-md overflow-hidden bg-muted shrink-0">
+                        <Image
                           src={listing.images[0]}
                           alt={listing.title}
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="(max-width: 640px) 100vw, 128px"
+                          className="object-cover"
                         />
                       </div>
                     )}

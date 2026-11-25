@@ -11,6 +11,9 @@ export interface SearchFiltersProps {
   filters: ListingFilterParams;
   onFilterChange: (filters: ListingFilterParams) => void;
   onReset: () => void;
+  searchInput?: string;
+  onSearchInputChange?: (value: string) => void;
+  onSearchSubmit?: (value: string) => void;
   className?: string;
 }
 
@@ -62,13 +65,31 @@ export function SearchFilters({
   filters,
   onFilterChange,
   onReset,
+  searchInput: controlledSearch,
+  onSearchInputChange,
+  onSearchSubmit,
   className,
 }: SearchFiltersProps) {
-  const [searchInput, setSearchInput] = React.useState(filters.query || "");
+  const [localSearch, setLocalSearch] = React.useState(filters.query || "");
+  const isControlled = controlledSearch !== undefined;
+  const searchValue = isControlled ? controlledSearch : localSearch;
+
+  const setSearchValue = (next: string) => {
+    if (onSearchInputChange) {
+      onSearchInputChange(next);
+    } else {
+      setLocalSearch(next);
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onFilterChange({ ...filters, query: searchInput });
+    const trimmed = searchValue.trim();
+    if (onSearchSubmit) {
+      onSearchSubmit(trimmed);
+    } else {
+      onFilterChange({ ...filters, query: trimmed || undefined });
+    }
   };
 
   const handlePriceSelect = (value: string) => {
@@ -96,7 +117,6 @@ export function SearchFilters({
     onFilterChange({ ...filters, amenities: next.length > 0 ? next : undefined });
   };
 
-  // Generate removable active chips
   const activeChips: { key: string; label: string; onRemove: () => void }[] = [];
 
   if (filters.query) {
@@ -104,7 +124,7 @@ export function SearchFilters({
       key: "query",
       label: `Từ khóa: "${filters.query}"`,
       onRemove: () => {
-        setSearchInput("");
+        setSearchValue("");
         onFilterChange({ ...filters, query: undefined });
       },
     });
@@ -142,6 +162,26 @@ export function SearchFilters({
       label: match?.label || "Mức giá",
       onRemove: () => onFilterChange({ ...filters, minPrice: undefined, maxPrice: undefined }),
     });
+  } else if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+    const label =
+      filters.minPrice !== undefined && filters.maxPrice !== undefined
+        ? `${(filters.minPrice / 1_000_000).toFixed(1)} - ${(filters.maxPrice / 1_000_000).toFixed(1)} triệu`
+        : filters.minPrice !== undefined
+        ? `Từ ${(filters.minPrice / 1_000_000).toFixed(1)} triệu`
+        : `Dưới ${((filters.maxPrice ?? 0) / 1_000_000).toFixed(1)} triệu`;
+    activeChips.push({
+      key: "custom-price",
+      label,
+      onRemove: () => onFilterChange({ ...filters, minPrice: undefined, maxPrice: undefined }),
+    });
+  }
+
+  if (filters.bedrooms !== undefined) {
+    activeChips.push({
+      key: "bedrooms",
+      label: `Từ ${filters.bedrooms} PN`,
+      onRemove: () => onFilterChange({ ...filters, bedrooms: undefined }),
+    });
   }
 
   if (filters.amenities && filters.amenities.length > 0) {
@@ -157,17 +197,32 @@ export function SearchFilters({
   return (
     <div className={className}>
       {/* Search Bar Row */}
-      <form onSubmit={handleSearchSubmit} className="flex gap-2 mb-4">
-        <div className="relative flex-1">
+      <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1 min-w-0">
           <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Tìm kiếm theo khu vực, đường, trường ĐH (VD: Hải Châu, Đông Á, Mỹ Khê)..."
-            className="pl-9"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder="Tìm theo khu vực, đường, trường ĐH (VD: Hải Châu, Đông Á, Mỹ Khê)..."
+            className="pl-9 pr-8"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          {searchValue && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchValue("");
+                if (filters.query) {
+                  onFilterChange({ ...filters, query: undefined });
+                }
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+              aria-label="Xóa từ khóa tìm kiếm"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-        <Button type="submit" variant="primary" className="shrink-0">
+        <Button type="submit" variant="primary" className="shrink-0 w-full sm:w-auto">
           Tìm kiếm
         </Button>
       </form>
@@ -232,13 +287,13 @@ export function SearchFilters({
           {activeChips.map((chip) => (
             <span
               key={chip.key}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-secondary text-secondary-foreground border border-purple-200"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-secondary text-secondary-foreground border border-purple-200 max-w-full"
             >
-              <span>{chip.label}</span>
+              <span className="truncate">{chip.label}</span>
               <button
                 type="button"
                 onClick={chip.onRemove}
-                className="hover:bg-purple-200 rounded-full p-0.5 text-secondary-foreground cursor-pointer"
+                className="hover:bg-purple-200 rounded-full p-0.5 text-secondary-foreground cursor-pointer shrink-0"
                 aria-label={`Xóa bộ lọc ${chip.label}`}
               >
                 <X className="h-3 w-3" />
@@ -248,7 +303,10 @@ export function SearchFilters({
 
           <button
             type="button"
-            onClick={onReset}
+            onClick={() => {
+              setSearchValue("");
+              onReset();
+            }}
             className="text-xs font-semibold text-destructive hover:underline ml-auto flex items-center gap-1 cursor-pointer"
           >
             <RotateCcw className="h-3.5 w-3.5" />

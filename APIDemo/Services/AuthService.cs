@@ -1,11 +1,13 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using APIDemo.DTOs;
 using APIDemo.Exceptions;
 using APIDemo.Models;
 using APIDemo.Repositories;
 using APIDemo.Security;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.IdentityModel.Tokens;
 
 namespace APIDemo.Services
@@ -21,7 +23,9 @@ namespace APIDemo.Services
             _configuration = configuration;
         }
 
-        public async Task<AuthResponseDto> RegisterAsync(UserRegisterDto dto)
+        public async Task<(AuthResponseDto Response, string RefreshToken, DateTime RefreshTokenExpiresAt)> RegisterAsync(
+            UserRegisterDto dto,
+            string? ipAddress = null)
         {
             var normalizedRole = ValidatePublicRegistrationRole(dto.Role);
 
@@ -46,40 +50,34 @@ namespace APIDemo.Services
                 PasswordSalt = salt,
                 Phone = string.IsNullOrWhiteSpace(dto.Phone) ? "0912345678" : dto.Phone.Trim(),
                 Role = normalizedRole,
-                // Chặn tự gán Department = "HR" để vượt qua Policy MustBeHR khi tự đăng ký
                 Department = "General",
                 DateOfBirth = dto.DateOfBirth,
+                IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
 
             await _authRepository.CreateUserAsync(user);
 
             var (token, expiresAt) = GenerateJwtToken(user);
+            var (rawRefresh, refreshExpiresAt) = await IssueRefreshTokenAsync(user.Id, ipAddress);
 
-            return new AuthResponseDto
-            {
-                Message = "Đăng ký tài khoản thành công!",
-                Token = token,
-                ExpiresAt = expiresAt,
-                User = new AuthUserDto
-                {
-                    Id = user.Id,
-                    Username = user.Username,
-                    FullName = user.FullName,
-                    Email = user.Email,
-                    Role = user.Role,
-                    Department = user.Department,
-                    DateOfBirth = user.DateOfBirth
-                }
-            };
+            var response = BuildAuthResponse("Đăng ký tài khoản thành công!", token, expiresAt, user);
+            return (response, rawRefresh, refreshExpiresAt);
         }
 
-        public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
+        public async Task<(AuthResponseDto Response, string RefreshToken, DateTime RefreshTokenExpiresAt)?> LoginAsync(
+            LoginDto dto,
+            string? ipAddress = null)
         {
             var identifier = dto.Username.Trim();
             var user = await _authRepository.GetByUsernameAsync(identifier)
                 ?? await _authRepository.GetByEmailAsync(identifier.ToLowerInvariant());
             if (user == null) return null;
+
+            if (!user.IsActive)
+            {
+                throw new ForbiddenException("Tài khoản của bạn đã bị tạm khóa. Vui lòng liên hệ quản trị viên.");
+            }
 
             if (!PasswordHasher.VerifyPassword(dto.Password, user.PasswordHash, user.PasswordSalt, out var needsRehash))
             {
@@ -96,23 +94,105 @@ namespace APIDemo.Services
             }
 
             var (token, expiresAt) = GenerateJwtToken(user);
+            var (rawRefresh, refreshExpiresAt) = await IssueRefreshTokenAsync(user.Id, ipAddress);
 
-            return new AuthResponseDto
+            var response = BuildAuthResponse("Đăng nhập thành công!", token, expiresAt, user);
+            return (response, rawRefresh, refreshExpiresAt);
+        }
+
+        public async Task<(AuthResponseDto Response, string RefreshToken, DateTime RefreshTokenExpiresAt)> RefreshAsync(
+            string refreshToken,
+            string? ipAddress = null)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                Message = "Đăng nhập thành công!",
-                Token = token,
-                ExpiresAt = expiresAt,
-                User = new AuthUserDto
+                throw new UnauthorizedException("Thiếu Refresh Token.");
+            }
+
+            var tokenHash = HashRefreshToken(refreshToken.Trim());
+            var stored = await _authRepository.GetRefreshTokenByHashAsync(tokenHash);
+            if (stored == null || stored.User == null)
+            {
+                throw new UnauthorizedException("Refresh Token không hợp lệ.");
+            }
+
+            // Phát hiện reuse attack: token đã bị thu hồi trước đó -> thu hồi toàn bộ phiên của user
+            if (stored.IsRevoked)
+            {
+                await _authRepository.RevokeAllUserRefreshTokensAsync(stored.UserId);
+                throw new UnauthorizedException("Phát hiện Refresh Token đã qua sử dụng. Toàn bộ phiên đã bị thu hồi để bảo mật.");
+            }
+
+            if (stored.IsExpired)
+            {
+                throw new UnauthorizedException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+            }
+
+            if (!stored.User.IsActive)
+            {
+                await _authRepository.RevokeAllUserRefreshTokensAsync(stored.UserId);
+                throw new ForbiddenException("Tài khoản đã bị tạm khóa.");
+            }
+
+            // Refresh Token Rotation: thu hồi token cũ và cấp cặp mới
+            var (newRawRefresh, newHash, refreshExpiresAt) = CreateRefreshTokenRecord(stored.UserId, ipAddress);
+            stored.RevokedAt = DateTime.UtcNow;
+            stored.ReplacedByTokenHash = newHash;
+
+            await _authRepository.AddRefreshTokenAsync(new RefreshToken
+            {
+                UserId = stored.UserId,
+                TokenHash = newHash,
+                ExpiresAt = refreshExpiresAt,
+                CreatedAt = DateTime.UtcNow,
+                CreatedByIp = ipAddress
+            });
+
+            var (accessToken, accessExpiresAt) = GenerateJwtToken(stored.User);
+            var response = BuildAuthResponse("Làm mới phiên đăng nhập thành công!", accessToken, accessExpiresAt, stored.User);
+            return (response, newRawRefresh, refreshExpiresAt);
+        }
+
+        public async Task LogoutAsync(string? refreshToken, int? userId = null)
+        {
+            if (!string.IsNullOrWhiteSpace(refreshToken))
+            {
+                var tokenHash = HashRefreshToken(refreshToken.Trim());
+                var stored = await _authRepository.GetRefreshTokenByHashAsync(tokenHash);
+                if (stored != null && !stored.IsRevoked)
                 {
-                    Id = user.Id,
-                    Username = user.Username,
-                    FullName = user.FullName,
-                    Email = user.Email,
-                    Role = user.Role,
-                    Department = user.Department,
-                    DateOfBirth = user.DateOfBirth
+                    stored.RevokedAt = DateTime.UtcNow;
+                    await _authRepository.SaveChangesAsync();
                 }
-            };
+            }
+            else if (userId.HasValue && userId.Value > 0)
+            {
+                await _authRepository.RevokeAllUserRefreshTokensAsync(userId.Value);
+            }
+        }
+
+        public async Task ChangePasswordAsync(int userId, ChangePasswordDto dto)
+        {
+            var user = await _authRepository.GetByIdAsync(userId)
+                ?? throw new NotFoundException("Không tìm thấy tài khoản người dùng.");
+
+            if (!PasswordHasher.VerifyPassword(dto.CurrentPassword, user.PasswordHash, user.PasswordSalt, out _))
+            {
+                throw new BadRequestException("Mật khẩu hiện tại không chính xác.");
+            }
+
+            if (dto.CurrentPassword == dto.NewPassword)
+            {
+                throw new BadRequestException("Mật khẩu mới phải khác mật khẩu hiện tại.");
+            }
+
+            PasswordHasher.CreatePasswordHash(dto.NewPassword, out var newHash, out var newSalt);
+            user.PasswordHash = newHash;
+            user.PasswordSalt = newSalt;
+            await _authRepository.UpdateUserAsync(user);
+
+            // Thu hồi toàn bộ Refresh Token đang hoạt động trên các thiết bị khác sau khi đổi mật khẩu
+            await _authRepository.RevokeAllUserRefreshTokensAsync(userId);
         }
 
         public static string ValidatePublicRegistrationRole(string? requestedRole)
@@ -136,6 +216,57 @@ namespace APIDemo.Services
             throw new ForbiddenException(
                 "Không được phép tự đăng ký với vai trò đặc quyền (Admin/Manager/Staff). Chỉ cho phép đăng ký Tenant hoặc Owner.");
         }
+
+        private async Task<(string RawToken, DateTime ExpiresAt)> IssueRefreshTokenAsync(int userId, string? ipAddress)
+        {
+            var (rawToken, tokenHash, expiresAt) = CreateRefreshTokenRecord(userId, ipAddress);
+            await _authRepository.AddRefreshTokenAsync(new RefreshToken
+            {
+                UserId = userId,
+                TokenHash = tokenHash,
+                ExpiresAt = expiresAt,
+                CreatedAt = DateTime.UtcNow,
+                CreatedByIp = ipAddress
+            });
+
+            return (rawToken, expiresAt);
+        }
+
+        private (string RawToken, string TokenHash, DateTime ExpiresAt) CreateRefreshTokenRecord(int userId, string? ipAddress)
+        {
+            var randomBytes = RandomNumberGenerator.GetBytes(64);
+            var rawToken = WebEncoders.Base64UrlEncode(randomBytes);
+            var tokenHash = HashRefreshToken(rawToken);
+
+            var jwtSettings = _configuration.GetSection("JwtSettings");
+            var refreshDays = double.TryParse(jwtSettings["RefreshTokenExpiryDays"], out var days) ? days : 7;
+            var expiresAt = DateTime.UtcNow.AddDays(refreshDays);
+
+            return (rawToken, tokenHash, expiresAt);
+        }
+
+        private static string HashRefreshToken(string rawToken)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
+            return Convert.ToHexString(bytes);
+        }
+
+        private static AuthResponseDto BuildAuthResponse(string message, string token, DateTime expiresAt, User user) => new()
+        {
+            Message = message,
+            Token = token,
+            ExpiresAt = expiresAt,
+            User = new AuthUserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                FullName = user.FullName,
+                Email = user.Email,
+                Role = user.Role,
+                Department = user.Department,
+                DateOfBirth = user.DateOfBirth
+            }
+        };
 
         private (string Token, DateTime ExpiresAt) GenerateJwtToken(User user)
         {
@@ -167,7 +298,7 @@ namespace APIDemo.Services
 
             var issuer = jwtSettings["Issuer"] ?? "https://localhost:7255";
             var audience = jwtSettings["Audience"] ?? "https://localhost:7255";
-            var expiryMinutes = double.TryParse(jwtSettings["ExpiryMinutes"], out var minutes) ? minutes : 60;
+            var expiryMinutes = double.TryParse(jwtSettings["ExpiryMinutes"], out var minutes) ? minutes : 15;
             var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
             var token = new JwtSecurityToken(

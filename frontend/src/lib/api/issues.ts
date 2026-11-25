@@ -1,3 +1,7 @@
+/**
+ * NOTE: Mock adapter — Backend chưa có bảng/API /api/issues (báo cáo sự cố / bảo trì).
+ * Khi Backend bổ sung IssuesController, thay thế hàm này bằng apiRequest("/issues").
+ */
 import { IssueReport } from "@/types";
 import { mockIssueReports } from "@/mocks/issues";
 

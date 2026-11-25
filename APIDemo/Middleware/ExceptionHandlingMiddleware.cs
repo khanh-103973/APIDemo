@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using APIDemo.DTOs.Common;
 using APIDemo.Exceptions;
+using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Middleware
 {
@@ -81,6 +82,9 @@ namespace APIDemo.Middleware
             return exception switch
             {
                 AppException appEx => (appEx.StatusCode, appEx.Message),
+                DbUpdateConcurrencyException => (
+                    StatusCodes.Status409Conflict,
+                    "Dữ liệu vừa được thay đổi bởi phiên khác. Vui lòng tải lại và thử lại."),
                 ArgumentException or InvalidOperationException =>
                     (StatusCodes.Status400BadRequest, exception.Message),
                 KeyNotFoundException =>

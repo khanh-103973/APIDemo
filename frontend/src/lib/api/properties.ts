@@ -1,3 +1,7 @@
+/**
+ * NOTE: Mock adapter — Backend hiện quản lý bất động sản phẳng qua bảng Houses (/api/houses).
+ * Khi Backend tách thêm bảng Properties & Rooms, thay thế các hàm này bằng apiRequest("/properties") / apiRequest("/rooms").
+ */
 import { Property, Room } from "@/types";
 import { mockProperties, mockRooms } from "@/mocks/properties";
 

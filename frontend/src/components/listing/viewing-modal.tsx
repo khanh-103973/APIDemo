@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createViewingRequest } from "@/lib/api/viewings";
+import { createViewingRequestAsync } from "@/lib/api/viewings";
 import { useMockAuth } from "@/lib/auth/mock-auth";
 
 export interface ViewingModalProps {
@@ -31,40 +31,62 @@ const timeSlotOptions = [
   { label: "18:00 - 19:00 (Tối)", value: "18:00 - 19:00" },
 ];
 
+function getLocalIsoDate(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export function ViewingModal({ listing, open, onOpenChange }: ViewingModalProps) {
   const { user } = useMockAuth();
-  // Default date to tomorrow in YYYY-MM-DD for native input
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const defaultDateStr = tomorrow.toISOString().split("T")[0];
-
-  const [date, setDate] = React.useState(defaultDateStr);
+  const [date, setDate] = React.useState("");
+  const [minDate, setMinDate] = React.useState("");
   const [timeSlot, setTimeSlot] = React.useState("09:00 - 10:00");
   const [note, setNote] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Initialize date lazily when modal opens on client to avoid SSR/client timezone hydration mismatches
+  React.useEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => {
+      setMinDate(getLocalIsoDate(0));
+      setDate((prev) => prev || getLocalIsoDate(1));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const preferredDate = date.split("-").reverse().join("/");
-      createViewingRequest({
-        listingId: listing.id,
-        tenantId: user?.id || "usr_tenant_1",
-        landlordId: listing.landlordId,
-        preferredDate,
-        preferredTimeSlot: timeSlot,
-        tenantNote: note.trim(),
-      });
-      setIsSubmitting(false);
-      setIsSuccess(true);
-    }, 400);
+    const preferredDate = date.split("-").reverse().join("/");
+    const result = await createViewingRequestAsync({
+      listingId: listing.id,
+      tenantId: user?.id || "",
+      landlordId: listing.landlordId,
+      preferredDate,
+      dateIso: date,
+      preferredTimeSlot: timeSlot,
+      tenantNote: note.trim(),
+    });
+
+    setIsSubmitting(false);
+    if (!result.success) {
+      setError(result.error || "Không thể tạo lịch hẹn. Vui lòng thử lại.");
+      return;
+    }
+    setIsSuccess(true);
   };
 
   const handleReset = () => {
     setIsSuccess(false);
+    setError(null);
     setNote("");
     onOpenChange(false);
   };
@@ -114,6 +136,11 @@ export function ViewingModal({ listing, open, onOpenChange }: ViewingModalProps)
           </DialogHeader>
 
           <div className="space-y-3 py-2">
+            {error && (
+              <div className="p-3 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 font-medium">
+                {error}
+              </div>
+            )}
             <div className="p-3 bg-surface rounded-md border border-border text-xs">
               <span className="text-muted-foreground block">Phòng đang xem:</span>
               <span className="font-semibold text-foreground line-clamp-1">{listing.title}</span>
@@ -129,7 +156,7 @@ export function ViewingModal({ listing, open, onOpenChange }: ViewingModalProps)
                 type="date"
                 required
                 value={date}
-                min={new Date().toISOString().split("T")[0]}
+                min={minDate || undefined}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>

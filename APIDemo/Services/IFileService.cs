@@ -5,7 +5,7 @@ namespace APIDemo.Services
 {
     public interface IFileService
     {
-        Task<FileResponseDto> UploadFileAsync(IFormFile file);
-        Task<FileDownloadDto?> GetFileForDownloadAsync(int id);
+        Task<FileResponseDto> UploadFileAsync(IFormFile file, int ownerId);
+        Task<FileDownloadDto?> GetFileForDownloadAsync(int id, int currentUserId, bool isAdmin);
     }
 }

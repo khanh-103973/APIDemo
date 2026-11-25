@@ -1,12 +1,17 @@
 "use client";
 
 import { User, Listing, ActivityLog, ListingStatus, ModerationStatus, UserStatus } from "@/types";
-import { mockUsers } from "@/mocks/users";
 import { mockListings } from "@/mocks/listings";
 import { getAllUsers } from "@/lib/auth/mock-auth";
 import { getUsers } from "@/lib/api/users";
 import { fetchAllHousesFromApi } from "@/lib/api/listings";
-import { apiRequest, getAuthToken } from "@/lib/api/client";
+import {
+  apiRequest,
+  AUTH_EVENT_NAME,
+  clearStoredAuthSession,
+  getAuthToken,
+  STORAGE_KEY_USER,
+} from "@/lib/api/client";
 
 const STORAGE_KEY_ADMIN_USERS = "house_rental_admin_users";
 const STORAGE_KEY_ADMIN_LISTINGS = "house_rental_listings";
@@ -258,6 +263,25 @@ export async function fetchAdminStatsFromApi() {
   }
 }
 
+export async function toggleAdminUserStatusAsync(
+  userId: string,
+  nextIsActive: boolean
+): Promise<User[]> {
+  const numericId = Number(userId);
+  if (getAuthToken() && Number.isInteger(numericId) && numericId > 0) {
+    try {
+      await apiRequest(`/users/${numericId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive: nextIsActive }),
+      });
+      return await fetchAdminUsersFromApi();
+    } catch {
+      // Fall back to local toggle if offline
+    }
+  }
+  return toggleAdminUserStatus(userId);
+}
+
 export function toggleAdminUserStatus(userId: string): User[] {
   const users = getAdminUsers();
   const next = users.map((u) => {
@@ -271,12 +295,14 @@ export function toggleAdminUserStatus(userId: string): User[] {
     try {
       localStorage.setItem(STORAGE_KEY_ADMIN_USERS, JSON.stringify(next));
       // Real-time security revocation: if suspended user has active session, terminate it
-      const rawUser = localStorage.getItem("house_rental_mock_user");
+      const rawUser =
+        sessionStorage.getItem(STORAGE_KEY_USER) ||
+        localStorage.getItem(STORAGE_KEY_USER);
       if (rawUser) {
         const parsed = JSON.parse(rawUser);
         if (parsed.id === userId) {
-          localStorage.removeItem("house_rental_mock_user");
-          window.dispatchEvent(new Event("house_rental_auth_change"));
+          clearStoredAuthSession();
+          window.dispatchEvent(new Event(AUTH_EVENT_NAME));
         }
       }
     } catch {}
@@ -295,6 +321,46 @@ export function getAdminListings(): Listing[] {
     localStorage.setItem(STORAGE_KEY_ADMIN_LISTINGS, JSON.stringify(mockListings));
   } catch {}
   return mockListings;
+}
+
+export async function moderateAdminListingAsync(
+  target: Listing,
+  decision: "approved" | "rejected" | "changes_requested",
+  notes?: string
+): Promise<Listing[]> {
+  const numericHouseId = Number(target.id.replace("house_", ""));
+  if (getAuthToken() && Number.isInteger(numericHouseId) && numericHouseId > 0) {
+    const backendStatus =
+      decision === "approved"
+        ? "Available"
+        : decision === "rejected"
+        ? "Rejected"
+        : "Pending";
+    const fullAddress = [target.address, target.district, target.city]
+      .filter(Boolean)
+      .join(", ");
+    try {
+      await apiRequest(`/houses/${numericHouseId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: target.title,
+          description: target.description,
+          address: fullAddress,
+          price: target.rentPrice,
+          area: target.area,
+          bedrooms: target.bedrooms,
+          imageUrl: target.images[0] || "",
+          status: backendStatus,
+          ownerId: Number(target.landlordId) || 1,
+        }),
+      });
+      const refreshed = await fetchAllHousesFromApi();
+      if (refreshed) return refreshed;
+    } catch {
+      // Fallback to local update if API fails
+    }
+  }
+  return moderateAdminListing(target.id, decision, notes);
 }
 
 export function moderateAdminListing(

@@ -16,7 +16,10 @@ namespace APIDemo.Repositories
 
         public async Task<PageResult<House>> GetAllAsync(HouseQueryParameters queryParams)
         {
-            var query = _context.Houses.AsNoTracking().AsQueryable();
+            var query = _context.Houses
+                .AsNoTracking()
+                .Include(h => h.Owner)
+                .AsQueryable();
 
             // 1. SEARCH (Tìm kiếm tương đối theo Title hoặc Address)
             if (!string.IsNullOrWhiteSpace(queryParams.SearchTerm))
@@ -82,7 +85,9 @@ namespace APIDemo.Repositories
 
         public async Task<House?> GetByIdAsync(int id)
         {
-            return await _context.Houses.FindAsync(id);
+            return await _context.Houses
+                .Include(h => h.Owner)
+                .FirstOrDefaultAsync(h => h.Id == id);
         }
 
         public async Task AddAsync(House house)
@@ -97,7 +102,9 @@ namespace APIDemo.Repositories
 
         public void Delete(House house)
         {
-            _context.Houses.Remove(house);
+            house.IsDeleted = true;
+            house.DeletedAt = DateTime.UtcNow;
+            _context.Houses.Update(house);
         }
 
         public async Task<bool> SaveChangesAsync()

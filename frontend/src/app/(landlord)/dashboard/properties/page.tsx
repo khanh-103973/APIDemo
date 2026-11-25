@@ -36,9 +36,11 @@ export default function LandlordPropertiesPage() {
   const [notice, setNotice] = React.useState<string | null>(null);
 
   // Sync if user switches
-  React.useEffect(() => {
+  const [prevLandlordId, setPrevLandlordId] = React.useState(landlordId);
+  if (landlordId !== prevLandlordId) {
+    setPrevLandlordId(landlordId);
     setProperties(mockProperties.filter((p) => p.landlordId === landlordId));
-  }, [landlordId]);
+  }
 
   // Form State for new property
   const [newProp, setNewProp] = React.useState({

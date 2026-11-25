@@ -31,9 +31,9 @@ export default function AdminListingsPage() {
 
   React.useEffect(() => {
     let active = true;
-    setListings(getAdminListings());
     void fetchAdminListingsFromApi().then((data) => {
-      if (active && data.length > 0) setListings(data);
+      if (!active) return;
+      setListings(data.length > 0 ? data : getAdminListings());
     });
     return () => {
       active = false;
@@ -126,6 +126,7 @@ export default function AdminListingsPage() {
             className="h-9 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">Tất cả tỉnh / thành</option>
+            <option value="TP. Đà Nẵng">TP. Đà Nẵng</option>
             <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
             <option value="Hà Nội">Hà Nội</option>
           </select>

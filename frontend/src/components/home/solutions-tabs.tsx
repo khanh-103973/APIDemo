@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   KeyRound,
   Building,
-  CheckCircle2,
   CalendarCheck,
   Receipt,
   FileText,
@@ -14,7 +13,6 @@ import {
   Zap,
   ArrowRight,
   TrendingUp,
-  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -25,29 +23,29 @@ export function SolutionsTabs() {
     <div className="w-full">
       {/* Tab Switcher */}
       <div className="flex justify-center mb-10">
-        <div className="inline-flex p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
+        <div className="flex flex-col sm:inline-flex sm:flex-row w-full sm:w-auto max-w-full p-1.5 rounded-2xl bg-slate-100 border border-slate-200 gap-1 sm:gap-0">
           <button
             type="button"
             onClick={() => setActiveTab("tenant")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               activeTab === "tenant"
                 ? "bg-white text-emerald-700 shadow-md"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <KeyRound className="h-4 w-4 text-emerald-600" />
+            <KeyRound className="h-4 w-4 text-emerald-600 shrink-0" />
             <span>Dành cho Khách thuê</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("landlord")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               activeTab === "landlord"
                 ? "bg-white text-primary shadow-md"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Building className="h-4 w-4 text-primary" />
+            <Building className="h-4 w-4 text-primary shrink-0" />
             <span>Dành cho Chủ nhà & Quản lý</span>
           </button>
         </div>

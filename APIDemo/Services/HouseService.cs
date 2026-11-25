@@ -8,23 +8,28 @@ namespace APIDemo.Services
     public class HouseService : IHouseService
     {
         private readonly IHouseRepository _houseRepo;
+        private readonly IImageStorageService _imageStorage;
 
-        public HouseService(IHouseRepository houseRepo)
+        public HouseService(IHouseRepository houseRepo, IImageStorageService imageStorage)
         {
             _houseRepo = houseRepo;
+            _imageStorage = imageStorage;
         }
 
-        public async Task<PageResult<House>> GetAllHousesAsync(HouseQueryParameters queryParams)
+        public async Task<PageResult<HouseResponseDto>> GetAllHousesAsync(HouseQueryParameters queryParams)
         {
-            return await _houseRepo.GetAllAsync(queryParams);
+            var page = await _houseRepo.GetAllAsync(queryParams);
+            var dtoItems = page.Items.Select(MapToResponseDto).ToList();
+            return new PageResult<HouseResponseDto>(dtoItems, page.TotalCount, page.PageNumber, page.PageSize);
         }
 
-        public async Task<House?> GetHouseByIdAsync(int id)
+        public async Task<HouseResponseDto?> GetHouseByIdAsync(int id)
         {
-            return await _houseRepo.GetByIdAsync(id);
+            var house = await _houseRepo.GetByIdAsync(id);
+            return house is null ? null : MapToResponseDto(house);
         }
 
-        public async Task<House> CreateHouseAsync(HouseDto dto)
+        public async Task<HouseResponseDto> CreateHouseAsync(HouseDto dto)
         {
             var house = new House
             {
@@ -41,13 +46,15 @@ namespace APIDemo.Services
 
             await _houseRepo.AddAsync(house);
             await _houseRepo.SaveChangesAsync();
-            return house;
+            return MapToResponseDto(house);
         }
 
         public async Task<bool> UpdateHouseAsync(int id, HouseDto dto)
         {
             var house = await _houseRepo.GetByIdAsync(id);
             if (house == null) return false;
+
+            var oldImageUrl = house.ImageUrl;
 
             house.Title = dto.Title;
             house.Description = dto.Description;
@@ -60,7 +67,17 @@ namespace APIDemo.Services
             house.OwnerId = dto.OwnerId;
 
             _houseRepo.Update(house);
-            return await _houseRepo.SaveChangesAsync();
+            var saved = await _houseRepo.SaveChangesAsync();
+
+            // Tự động dọn file ảnh cục bộ cũ nếu chủ nhà thay bằng ảnh mới
+            if (saved &&
+                !string.IsNullOrWhiteSpace(oldImageUrl) &&
+                !string.Equals(oldImageUrl.Trim(), (dto.ImageUrl ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                await _imageStorage.DeleteImageAsync(oldImageUrl);
+            }
+
+            return saved;
         }
 
         public async Task<bool> DeleteHouseAsync(int id)
@@ -68,8 +85,38 @@ namespace APIDemo.Services
             var house = await _houseRepo.GetByIdAsync(id);
             if (house == null) return false;
 
+            var oldImageUrl = house.ImageUrl;
+
+            // Soft Delete (IsDeleted = true, DeletedAt = UtcNow)
             _houseRepo.Delete(house);
-            return await _houseRepo.SaveChangesAsync();
+            var saved = await _houseRepo.SaveChangesAsync();
+
+            if (saved && !string.IsNullOrWhiteSpace(oldImageUrl))
+            {
+                await _imageStorage.DeleteImageAsync(oldImageUrl);
+            }
+
+            return saved;
+        }
+
+        private static HouseResponseDto MapToResponseDto(House house)
+        {
+            return new HouseResponseDto
+            {
+                Id = house.Id,
+                Title = house.Title,
+                Description = house.Description,
+                Address = house.Address,
+                Price = house.Price,
+                Area = house.Area,
+                Bedrooms = house.Bedrooms,
+                ImageUrl = house.ImageUrl,
+                Status = house.Status,
+                OwnerId = house.OwnerId,
+                OwnerName = house.Owner?.FullName,
+                CreatedAt = house.CreatedAt,
+                UpdatedAt = house.UpdatedAt
+            };
         }
     }
 }

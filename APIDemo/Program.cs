@@ -1,14 +1,23 @@
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using System.Threading.RateLimiting;
 using APIDemo.Authorization;
+using APIDemo.Controllers;
 using APIDemo.Data;
+using APIDemo.DTOs.Common;
+using APIDemo.Filters;
+using APIDemo.HealthChecks;
 using APIDemo.Middleware;
 using APIDemo.Models;
 using APIDemo.Repositories;
 using APIDemo.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -16,11 +25,14 @@ using Serilog;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
-    .CreateBootstrapLogger();
+    .CreateLogger();
 
 try
 {
     var builder = WebApplication.CreateBuilder(args);
+
+    // Nạp file cấu hình local không commit (appsettings.local.json) nếu tồn tại ở máy dev
+    builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
     // Đảm bảo thư mục wwwroot và wwwroot/images tồn tại để phục vụ Static Files
     var webRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
@@ -44,7 +56,14 @@ try
             .Enrich.FromLogContext();
     });
 
-    // 2. Cấu hình CORS theo danh sách Origin được phép (đọc từ cấu hình, mặc định cho Next.js :3000 & Vite :5173)
+    // 1.1 Cấu hình ForwardedHeaders để đọc đúng IP khách hàng khi chạy sau Nginx / Cloudflare / Load Balancer
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 2;
+    });
+
+    // 2. Cấu hình CORS theo danh sách Origin được phép (hỗ trợ HttpOnly Cookie qua AllowCredentials)
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
         ?? new[]
         {
@@ -65,45 +84,64 @@ try
         });
     });
 
-    // 3. Cấu hình Options Pattern cho FileSettings (Buổi 10)
+    // 3. Cấu hình Options Pattern cho FileSettings
     builder.Services.Configure<FileSettings>(builder.Configuration.GetSection(FileSettings.SectionName));
 
-    // 4. Đọc JwtSettings từ Configuration (appsettings / User Secrets / Environment Variables — không hardcode secret)
-    var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-    var secretKey = jwtSettings["SecretKey"];
-    if (string.IsNullOrWhiteSpace(secretKey) || secretKey.Length < 32)
-    {
-        throw new InvalidOperationException(
-            "Thiếu cấu hình JwtSettings:SecretKey (tối thiểu 32 ký tự). Hãy cấu hình qua User Secrets, Environment Variables hoặc appsettings.");
-    }
-
-    var jwtIssuer = jwtSettings["Issuer"] ?? "https://localhost:7255";
-    var jwtAudience = jwtSettings["Audience"] ?? "https://localhost:7255";
-
+    // 4. Đọc JwtSettings từ Configuration (User Secrets / Environment Variables / appsettings.local.json — không lưu secret trong Git)
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
-    .AddJwtBearer(options =>
-    {
-        options.RequireHttpsMetadata = false;
-        options.SaveToken = true;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-            RoleClaimType = ClaimTypes.Role,
-            ClockSkew = TimeSpan.Zero
-        };
-    });
+    .AddJwtBearer();
 
-    // 5. Cấu hình Authorization & Policies (Buổi 9)
+    builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+        .Configure<IConfiguration, IHostEnvironment>((options, configuration, env) =>
+        {
+            var jwtSettings = configuration.GetSection("JwtSettings");
+            var secretKey = jwtSettings["SecretKey"];
+            if (string.IsNullOrWhiteSpace(secretKey) || secretKey.Length < 32)
+            {
+                throw new InvalidOperationException(
+                    "Thiếu cấu hình JwtSettings:SecretKey (tối thiểu 32 ký tự). Hãy cấu hình qua User Secrets, Environment Variables hoặc appsettings.local.json.");
+            }
+
+            var jwtIssuer = jwtSettings["Issuer"] ?? "https://localhost:7255";
+            var jwtAudience = jwtSettings["Audience"] ?? "https://localhost:7255";
+
+            options.RequireHttpsMetadata = !env.IsDevelopment();
+            options.SaveToken = false;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtIssuer,
+                ValidAudience = jwtAudience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                RoleClaimType = ClaimTypes.Role,
+                ClockSkew = TimeSpan.Zero
+            };
+
+            // Chỉ fallback đọc Access Token từ HttpOnly Cookie (hr_access_token) khi request KHÔNG có Authorization header
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    if (string.IsNullOrEmpty(context.Token) &&
+                        !context.Request.Headers.ContainsKey("Authorization") &&
+                        context.Request.Cookies.TryGetValue(AuthController.AccessTokenCookieName, out var cookieToken) &&
+                        !string.IsNullOrWhiteSpace(cookieToken))
+                    {
+                        context.Token = cookieToken;
+                    }
+                    return Task.CompletedTask;
+                }
+            };
+        });
+
+    // 5. Cấu hình Authorization & Policies
     builder.Services.AddSingleton<IAuthorizationHandler, MinimumAgeHandler>();
     builder.Services.AddAuthorization(options =>
     {
@@ -114,7 +152,7 @@ try
             policy.Requirements.Add(new MinimumAgeRequirement(18)));
     });
 
-    // 6. Cấu hình Swagger nâng cao kèm Bearer JWT Auth & XML Docs (Buổi 13)
+    // 6. Cấu hình Swagger kèm Bearer JWT Auth & XML Docs (chỉ bật ở Development)
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
@@ -132,7 +170,7 @@ try
             Scheme = "Bearer",
             BearerFormat = "JWT",
             In = ParameterLocation.Header,
-            Description = "Nhập JWT token thu được sau khi đăng nhập (ví dụ: login admin/123456)."
+            Description = "Nhập JWT token thu được sau khi đăng nhập."
         });
 
         options.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
@@ -153,15 +191,16 @@ try
 
     builder.Services.AddOpenApi();
 
-    // 7. Đăng ký AppDbContext (Hỗ trợ SQL Server mặc định hoặc UseInMemoryDatabase khi test nhanh)
+    // 7. Đăng ký AppDbContext (SQL Server hoặc UseInMemoryDatabase khi chạy test)
     var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase", false);
+    var inMemoryDbName = builder.Configuration["InMemoryDatabaseName"] ?? "HouseRentalAPIDb";
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
     builder.Services.AddDbContext<AppDbContext>(options =>
     {
         if (useInMemory || string.IsNullOrWhiteSpace(connectionString))
         {
-            options.UseInMemoryDatabase("HouseRentalAPIDb");
+            options.UseInMemoryDatabase(inMemoryDbName);
         }
         else
         {
@@ -169,7 +208,7 @@ try
         }
     });
 
-    // 8. Đăng ký Dependency Injection (Chuẩn kiến trúc N-Tier Buổi 7 & 14)
+    // 8. Đăng ký Dependency Injection (N-Tier + Storage Abstraction)
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddScoped<IAuthRepository, AuthRepository>();
@@ -182,30 +221,95 @@ try
     builder.Services.AddScoped<IContractService, ContractService>();
     builder.Services.AddScoped<IFileRepository, FileRepository>();
     builder.Services.AddScoped<IFileService, FileService>();
+    builder.Services.AddScoped<IImageStorageService, LocalDiskImageStorageService>();
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(options =>
+    {
+        options.Conventions.Add(new DevelopmentOnlyControllerConvention(builder.Environment));
+    });
+
+    // 8.1 Health Checks (/health kiểm tra trạng thái ứng dụng và kết nối Database)
+    builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck>("database");
+
+    // 8.2 Rate Limiting chống brute-force cho endpoint đăng nhập (5 lần / phút / IP)
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        options.AddPolicy("AuthLoginPolicy", httpContext =>
+        {
+            var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: clientIp,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
+        });
+
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            {
+                context.HttpContext.Response.Headers.RetryAfter =
+                    Math.Ceiling(retryAfter.TotalSeconds).ToString();
+            }
+            else
+            {
+                context.HttpContext.Response.Headers.RetryAfter = "60";
+            }
+
+            var error = new ErrorResponse
+            {
+                StatusCode = StatusCodes.Status429TooManyRequests,
+                Message = "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau 1 phút.",
+                TraceId = context.HttpContext.TraceIdentifier,
+                Timestamp = DateTime.UtcNow
+            };
+
+            await context.HttpContext.Response.WriteAsync(
+                JsonSerializer.Serialize(error, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                }),
+                cancellationToken);
+        };
+    });
 
     var app = builder.Build();
 
-    // 9. Tự động Khởi tạo & Seed dữ liệu mẫu hệ thống thuê nhà (Buổi 15)
-    using (var scope = app.Services.CreateScope())
+    // 9. Chỉ auto-seed ở môi trường Development (hoặc khi cấu hình AutoSeedDatabase=true cho Docker/integration test),
+    // tránh race condition khi triển khai nhiều instance ở Production
+    var shouldAutoSeed = app.Environment.IsDevelopment() ||
+                         app.Configuration.GetValue<bool>("AutoSeedDatabase", false);
+    if (shouldAutoSeed)
     {
+        using var scope = app.Services.CreateScope();
         try
         {
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            context.Database.EnsureCreated();
             DbInitializer.Seed(context);
         }
         catch (Exception ex) when (ex is not HostAbortedException)
         {
-            Log.Warning(ex, "Không thể kết nối CSDL để SeedData tự động khi khởi động. Hãy đảm bảo đã chạy Database_HouseRental.sql trên SSMS hoặc bật UseInMemoryDatabase.");
+            Log.Warning(ex, "Không thể kết nối CSDL để khởi tạo/SeedData tự động khi khởi động.");
         }
     }
 
-    // 10. Pipeline Middlewares (Global Exception & Request Logging ở đầu pipeline)
+    // 10. Pipeline Middlewares
+    app.UseForwardedHeaders();
+    app.UseSecurityHeaders();
     app.UseExceptionHandling();
     app.UseRequestLogging();
 
-    // Chỉ bật Swagger ở môi trường Development (Buổi 13 Best Practice)
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -214,24 +318,54 @@ try
 
         app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
     }
+    else
+    {
+        app.UseHsts();
+        if (!app.Configuration.GetValue<bool>("DisableHttpsRedirection", false))
+        {
+            app.UseHttpsRedirection();
+        }
+    }
 
-    // Bật Static Files phục vụ ảnh nhà thuê từ wwwroot/images cho Frontend (Buổi 10)
+    // Bật Static Files phục vụ ảnh nhà thuê từ wwwroot/images
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRootPath),
         RequestPath = ""
     });
 
-    if (!app.Environment.IsDevelopment())
-    {
-        app.UseHttpsRedirection();
-    }
-
-    // CORS đặt trước Authentication / Authorization (Buổi 13)
+    // CORS đặt trước RateLimiter và Authentication / Authorization
     app.UseCors("AllowFrontend");
+    app.UseRateLimiter();
 
     app.UseAuthentication();
     app.UseAuthorization();
+
+    // Health Check endpoint công khai
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json; charset=utf-8";
+            var payload = new
+            {
+                status = report.Status.ToString(),
+                timestamp = DateTime.UtcNow,
+                checks = report.Entries.Select(entry => new
+                {
+                    name = entry.Key,
+                    status = entry.Value.Status.ToString(),
+                    description = entry.Value.Description,
+                    durationMs = Math.Round(entry.Value.Duration.TotalMilliseconds, 2)
+                })
+            };
+
+            await context.Response.WriteAsync(JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }));
+        }
+    });
 
     app.MapControllers();
 
@@ -245,3 +379,5 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+public partial class Program { }

@@ -1,3 +1,4 @@
+using APIDemo.Filters;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -5,6 +6,7 @@ namespace APIDemo.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [DevelopmentOnly]
     public class EmployeesController : ControllerBase
     {
         // 3. API yêu cầu Policy MustBeHR (Claim Department = "HR")

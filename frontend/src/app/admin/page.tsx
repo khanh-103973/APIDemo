@@ -25,7 +25,7 @@ import {
   getAdminListings,
   fetchAdminListingsFromApi,
   getAdminActivityLogs,
-  moderateAdminListing,
+  moderateAdminListingAsync,
 } from "@/lib/api/admin";
 import { Listing } from "@/types";
 
@@ -47,14 +47,14 @@ export default function AdminOverviewPage() {
 
   React.useEffect(() => {
     let active = true;
-    setStats(getAdminStats());
-    setListings(getAdminListings());
-    setLogs(getAdminActivityLogs());
-    void fetchAdminStatsFromApi().then((data) => {
-      if (active) setStats(data);
-    });
-    void fetchAdminListingsFromApi().then((data) => {
-      if (active && data.length > 0) setListings(data);
+    void Promise.all([
+      fetchAdminStatsFromApi(),
+      fetchAdminListingsFromApi(),
+    ]).then(([apiStats, apiListings]) => {
+      if (!active) return;
+      setStats(apiStats || getAdminStats());
+      setListings(apiListings.length > 0 ? apiListings : getAdminListings());
+      setLogs(getAdminActivityLogs());
     });
     return () => {
       active = false;
@@ -65,18 +65,18 @@ export default function AdminOverviewPage() {
     (l) => l.moderationStatus === "pending" || l.status === "pending"
   );
 
-  const handleQuickApprove = (id: string) => {
-    const updated = moderateAdminListing(id, "approved", "Duyệt xuất bản tự động qua Admin Dashboard");
+  const handleQuickApprove = async (item: Listing) => {
+    const updated = await moderateAdminListingAsync(item, "approved", "Duyệt xuất bản tự động qua Admin Dashboard");
     setListings(updated);
-    setStats(getAdminStats());
+    setStats(await fetchAdminStatsFromApi());
     setNotice("Đã phê duyệt tin đăng thành công! Tin hiện đã công khai trên sàn.");
     setTimeout(() => setNotice(null), 3500);
   };
 
-  const handleQuickReject = (id: string) => {
-    const updated = moderateAdminListing(id, "rejected", "Thông tin chưa đầy đủ hoặc không hợp lệ");
+  const handleQuickReject = async (item: Listing) => {
+    const updated = await moderateAdminListingAsync(item, "rejected", "Thông tin chưa đầy đủ hoặc không hợp lệ");
     setListings(updated);
-    setStats(getAdminStats());
+    setStats(await fetchAdminStatsFromApi());
     setNotice("Đã từ chối tin đăng vi phạm.");
     setTimeout(() => setNotice(null), 3500);
   };
@@ -165,7 +165,7 @@ export default function AdminOverviewPage() {
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2 pt-2 border-t border-border/60">
-              Bao phủ TP.HCM và Hà Nội
+              Bao phủ các quận TP. Đà Nẵng
             </p>
           </CardContent>
         </Card>
@@ -241,15 +241,15 @@ export default function AdminOverviewPage() {
         </Link>
 
         <Link
-          href="/admin/verifications"
+          href="/admin/bookings"
           className="p-4 rounded-xl border border-border bg-white hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center gap-3"
         >
           <div className="p-2.5 rounded-lg bg-purple-100 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-colors">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-bold text-foreground">Duyệt xác thực</p>
-            <p className="text-[11px] text-muted-foreground">{stats.pendingVerifications} hồ sơ chủ nhà</p>
+            <p className="text-xs font-bold text-foreground">Lịch hẹn xem phòng</p>
+            <p className="text-[11px] text-muted-foreground">Quản lý Bookings</p>
           </div>
         </Link>
 
@@ -345,7 +345,7 @@ export default function AdminOverviewPage() {
                       <Button
                         size="sm"
                         variant="primary"
-                        onClick={() => handleQuickApprove(item.id)}
+                        onClick={() => void handleQuickApprove(item)}
                         className="h-8 text-xs gap-1 cursor-pointer"
                       >
                         <Check className="h-3.5 w-3.5" />
@@ -354,7 +354,7 @@ export default function AdminOverviewPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleQuickReject(item.id)}
+                        onClick={() => void handleQuickReject(item)}
                         className="h-8 text-xs text-danger hover:bg-danger-subtle cursor-pointer"
                       >
                         <XCircle className="h-3.5 w-3.5" />

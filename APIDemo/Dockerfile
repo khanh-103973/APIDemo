@@ -1,30 +1,43 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
+# Stage 1: Base runtime (.NET 10 ASP.NET Core)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-USER $APP_UID
 WORKDIR /app
+
+# Cài curl để Docker healthcheck kiểm tra /health và tạo sẵn thư mục ghi file cho non-root user
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/wwwroot/images /app/Logs \
+    && chown -R $APP_UID:$APP_UID /app
+
+ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
-EXPOSE 8081
 
-
-# This stage is used to build the service project
+# Stage 2: Build (.NET 10 SDK)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+
+# Copy csproj trước để tận dụng Docker layer cache cho dotnet restore
 COPY ["APIDemo/APIDemo.csproj", "APIDemo/"]
 RUN dotnet restore "./APIDemo/APIDemo.csproj"
-COPY . .
-WORKDIR "/src/APIDemo"
-RUN dotnet build "./APIDemo.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# This stage is used to publish the service project to be copied to the final stage
+COPY ["APIDemo/", "APIDemo/"]
+WORKDIR "/src/APIDemo"
+RUN dotnet build "./APIDemo.csproj" -c "$BUILD_CONFIGURATION" --no-restore -o /app/build
+
+# Stage 3: Publish
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./APIDemo.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./APIDemo.csproj" -c "$BUILD_CONFIGURATION" --no-restore -o /app/publish /p:UseAppHost=false
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
+# Stage 4: Final production image
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=publish --chown=$APP_UID:$APP_UID /app/publish .
+
+USER $APP_UID
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+    CMD curl -fsS http://localhost:8080/health || exit 1
+
 ENTRYPOINT ["dotnet", "APIDemo.dll"]

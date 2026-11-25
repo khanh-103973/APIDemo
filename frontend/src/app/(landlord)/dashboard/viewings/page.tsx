@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Clock,
   Home,
@@ -9,31 +10,47 @@ import {
   CheckCircle2,
   Phone,
   User,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getLandlordViewings, updateViewingStatus, getAllListingsFromStorage } from "@/lib/api/landlord";
-import { getViewingRequests } from "@/lib/api/viewings";
+import { getAllListingsFromStorage } from "@/lib/api/landlord";
+import { getViewingRequests, updateViewingStatusAsync } from "@/lib/api/viewings";
 import { fetchAllHousesFromApi } from "@/lib/api/listings";
 import { mockListings } from "@/mocks/listings";
 import { mockUsers } from "@/mocks/users";
 import { getAllUsers } from "@/lib/auth/mock-auth";
-import { ViewingRequest, ViewingStatus } from "@/types";
+import { Listing, ViewingRequest, ViewingStatus } from "@/types";
 
 export default function LandlordViewingsPage() {
   const [viewings, setViewings] = React.useState<ViewingRequest[]>([]);
+  const [listings, setListings] = React.useState<Listing[]>([]);
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [notice, setNotice] = React.useState<string | null>(null);
 
+  const loadViewings = React.useCallback(async () => {
+    const [houses, apiViewings] = await Promise.all([
+      fetchAllHousesFromApi(),
+      getViewingRequests(),
+    ]);
+    if (houses) setListings(houses);
+    setViewings(apiViewings);
+  }, []);
+
   React.useEffect(() => {
     let active = true;
-    setViewings(getLandlordViewings());
-    void fetchAllHousesFromApi();
-    void getViewingRequests().then((data) => {
-      if (active && data.length > 0) setViewings(data);
-    });
+    const sync = async () => {
+      const [houses, apiViewings] = await Promise.all([
+        fetchAllHousesFromApi(),
+        getViewingRequests(),
+      ]);
+      if (!active) return;
+      if (houses) setListings(houses);
+      setViewings(apiViewings);
+    };
+    void sync();
     const handleSync = () => {
-      setViewings(getLandlordViewings());
+      void sync();
     };
     window.addEventListener("house_rental_viewings_change", handleSync);
     return () => {
@@ -47,21 +64,19 @@ export default function LandlordViewingsPage() {
     setTimeout(() => setNotice(null), 3500);
   };
 
-  const handleUpdate = (id: string, status: ViewingStatus) => {
-    const updated = updateViewingStatus(
-      id,
-      status,
-      status === "confirmed"
-        ? "Đã xác nhận lịch hẹn. Hẹn gặp bạn tại phòng đúng giờ!"
-        : "Chủ nhà bận khung giờ này."
-    );
-    setViewings(updated);
+  const handleUpdate = async (item: ViewingRequest, status: ViewingStatus) => {
+    const res = await updateViewingStatusAsync(item, status);
+    if (!res.success) {
+      showNotification(res.error || "Không thể cập nhật lịch hẹn.");
+      return;
+    }
+    await loadViewings();
     showNotification(
       status === "confirmed"
         ? "Đã xác nhận lịch hẹn xem phòng!"
         : status === "completed"
-        ? "Đã đánh dấu hoàn thành xem phòng!"
-        : "Đã từ chối lịch hẹn."
+        ? "Đã chốt thuê và gửi hợp đồng (Chờ khách thuê xác nhận ký)!"
+        : "Đã hủy lịch hẹn (khách không thuê). Phòng vẫn giữ trạng thái còn trống."
     );
   };
 
@@ -114,10 +129,15 @@ export default function LandlordViewingsPage() {
       {/* Viewings List */}
       <div className="space-y-3">
         {filtered.map((item) => {
-          const allListings = getAllListingsFromStorage();
+          const allListings = listings.length > 0 ? listings : getAllListingsFromStorage();
           const allUsers = getAllUsers();
           const listing = allListings.find((l) => l.id === item.listingId) || mockListings.find((l) => l.id === item.listingId);
-          const tenant = allUsers.find((u) => u.id === item.tenantId) || mockUsers.find((u) => u.id === item.tenantId) || {
+          const tenant: {
+            name?: string;
+            fullName?: string;
+            phone?: string;
+            phoneNumber?: string;
+          } = allUsers.find((u) => u.id === item.tenantId) || mockUsers.find((u) => u.id === item.tenantId) || {
             fullName: "Khách thuê",
             phoneNumber: "0912 345 678",
           };
@@ -131,11 +151,11 @@ export default function LandlordViewingsPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-foreground text-sm flex items-center gap-1.5">
                     <User className="h-4 w-4 text-primary" />
-                    {tenant.fullName || (tenant as any).name || "Khách thuê"}
+                    {tenant.fullName || tenant.name || "Khách thuê"}
                   </span>
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Phone className="h-3 w-3" />
-                    {tenant.phoneNumber || (tenant as any).phone || "0912 345 678"}
+                    {tenant.phoneNumber || tenant.phone || "0912 345 678"}
                   </span>
                   <StatusBadge status={item.status} size="sm" />
                 </div>
@@ -167,7 +187,7 @@ export default function LandlordViewingsPage() {
                       size="sm"
                       variant="primary"
                       className="gap-1 cursor-pointer text-xs"
-                      onClick={() => handleUpdate(item.id, "confirmed")}
+                      onClick={() => void handleUpdate(item, "confirmed")}
                     >
                       <Check className="h-3.5 w-3.5" />
                       Xác nhận hẹn
@@ -176,7 +196,7 @@ export default function LandlordViewingsPage() {
                       size="sm"
                       variant="outline"
                       className="gap-1 text-danger hover:bg-danger-subtle cursor-pointer text-xs"
-                      onClick={() => handleUpdate(item.id, "rejected")}
+                      onClick={() => void handleUpdate(item, "rejected")}
                     >
                       <XCircle className="h-3.5 w-3.5" />
                       Từ chối
@@ -185,15 +205,39 @@ export default function LandlordViewingsPage() {
                 )}
 
                 {item.status === "confirmed" && (
-                  <Button
-                    size="sm"
-                    variant="accent"
-                    className="gap-1 cursor-pointer text-xs"
-                    onClick={() => handleUpdate(item.id, "completed")}
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Đánh dấu đã xem xong
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="accent"
+                      className="gap-1 cursor-pointer text-xs"
+                      onClick={() => void handleUpdate(item, "completed")}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Chốt thuê & gửi hợp đồng
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 text-danger hover:bg-danger-subtle cursor-pointer text-xs"
+                      onClick={() => void handleUpdate(item, "rejected")}
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                      Xem xong — Không thuê
+                    </Button>
+                  </>
+                )}
+
+                {item.status === "completed" && (
+                  <Link href="/dashboard/contracts">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 cursor-pointer text-xs"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Xem hợp đồng
+                    </Button>
+                  </Link>
                 )}
               </div>
             </div>

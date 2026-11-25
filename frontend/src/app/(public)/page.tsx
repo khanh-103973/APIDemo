@@ -1,10 +1,6 @@
 import Link from "next/link";
 import {
-  Search,
   Building,
-  KeyRound,
-  ShieldCheck,
-  CheckCircle2,
   Sparkles,
   ArrowRight,
   MapPin,
@@ -60,7 +56,7 @@ export default async function HomePage() {
       {/* 2. Trust Value Proposition Strip */}
       <section className="py-8 bg-surface border-b border-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="flex items-center gap-3.5 p-2">
               <div className="h-11 w-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
                 <BadgeCheck className="h-6 w-6" />

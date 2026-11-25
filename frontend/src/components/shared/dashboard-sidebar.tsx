@@ -32,47 +32,56 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   exact?: boolean;
   badge?: string | number;
+  mockOnly?: boolean;
 }
+
+const ENABLE_DEMO_MODULES =
+  process.env.NEXT_PUBLIC_ENABLE_DEMO_MODULES === "true" ||
+  (process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ENABLE_DEMO_MODULES !== "false");
 
 interface DashboardSidebarProps {
   role: "landlord" | "tenant" | "admin";
+  onNavigate?: () => void;
+  className?: string;
 }
 
 const landlordNav: NavItem[] = [
   { title: "Tổng quan", href: "/dashboard", icon: LayoutDashboard, exact: true },
   { title: "Tin đăng cho thuê", href: "/dashboard/listings", icon: Building },
   { title: "Đăng tin mới", href: "/dashboard/listings/new", icon: PlusCircle },
-  { title: "Lịch hẹn xem phòng", href: "/dashboard/viewings", icon: CalendarCheck, badge: "1" },
-  { title: "Bất động sản", href: "/dashboard/properties", icon: Home },
-  { title: "Danh sách phòng", href: "/dashboard/rooms", icon: DoorOpen },
-  { title: "Quản lý khách thuê", href: "/dashboard/tenants", icon: Users },
+  { title: "Lịch hẹn xem phòng", href: "/dashboard/viewings", icon: CalendarCheck },
   { title: "Hợp đồng thuê", href: "/dashboard/contracts", icon: FileText },
-  { title: "Hóa đơn & Thu phí", href: "/dashboard/invoices", icon: Receipt, badge: "1" },
-  { title: "Yêu cầu bảo trì", href: "/dashboard/maintenance", icon: Wrench, badge: "1" },
+  { title: "Bất động sản", href: "/dashboard/properties", icon: Home, mockOnly: true },
+  { title: "Danh sách phòng", href: "/dashboard/rooms", icon: DoorOpen, mockOnly: true },
+  { title: "Quản lý khách thuê", href: "/dashboard/tenants", icon: Users, mockOnly: true },
+  { title: "Hóa đơn & Thu phí", href: "/dashboard/invoices", icon: Receipt, mockOnly: true },
+  { title: "Yêu cầu bảo trì", href: "/dashboard/maintenance", icon: Wrench, mockOnly: true },
   { title: "Hồ sơ chủ nhà", href: "/dashboard/profile", icon: User },
 ];
 
 const tenantNav: NavItem[] = [
   { title: "Phòng đang thuê", href: "/account/rentals", icon: KeyRound },
   { title: "Tin đã lưu", href: "/account/favorites", icon: Heart },
-  { title: "Lịch hẹn xem phòng", href: "/account/viewings", icon: CalendarCheck, badge: "1" },
+  { title: "Lịch hẹn xem phòng", href: "/account/viewings", icon: CalendarCheck },
   { title: "Hợp đồng của tôi", href: "/account/contracts", icon: FileText },
-  { title: "Hóa đơn thanh toán", href: "/account/invoices", icon: Receipt, badge: "1" },
-  { title: "Báo cáo sự cố", href: "/account/issues", icon: Wrench },
+  { title: "Hóa đơn thanh toán", href: "/account/invoices", icon: Receipt, mockOnly: true },
+  { title: "Báo cáo sự cố", href: "/account/issues", icon: Wrench, mockOnly: true },
   { title: "Hồ sơ cá nhân", href: "/account/profile", icon: User },
 ];
 
 const adminNav: NavItem[] = [
   { title: "Tổng quan", href: "/admin", icon: LayoutDashboard, exact: true },
   { title: "Quản lý tài khoản", href: "/admin/users", icon: Users },
+  { title: "Lịch hẹn xem phòng", href: "/admin/bookings", icon: CalendarCheck },
   { title: "Tất cả tin đăng", href: "/admin/listings", icon: Building, exact: true },
-  { title: "Hàng đợi kiểm duyệt", href: "/admin/listings/pending", icon: ClipboardList, badge: "1" },
-  { title: "Duyệt xác thực chủ nhà", href: "/admin/verifications", icon: ShieldCheck },
-  { title: "Báo cáo vi phạm", href: "/admin/reports", icon: AlertTriangle },
-  { title: "Nhật ký hoạt động", href: "/admin/activity-logs", icon: History },
+  { title: "Hàng đợi kiểm duyệt", href: "/admin/listings/pending", icon: ClipboardList },
+  { title: "Duyệt xác thực chủ nhà", href: "/admin/verifications", icon: ShieldCheck, mockOnly: true },
+  { title: "Báo cáo vi phạm", href: "/admin/reports", icon: AlertTriangle, mockOnly: true },
+  { title: "Nhật ký hoạt động", href: "/admin/activity-logs", icon: History, mockOnly: true },
 ];
 
-export function DashboardSidebar({ role }: DashboardSidebarProps) {
+export function DashboardSidebar({ role, onNavigate, className }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useMockAuth();
@@ -82,12 +91,16 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
     router.push("/login");
   };
 
-  const navItems =
+  const rawNavItems =
     role === "landlord"
       ? landlordNav
       : role === "tenant"
       ? tenantNav
       : adminNav;
+
+  const navItems = ENABLE_DEMO_MODULES
+    ? rawNavItems
+    : rawNavItems.filter((item) => !item.mockOnly);
 
   const roleTitles = {
     landlord: {
@@ -116,7 +129,12 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const CurrentRoleIcon = roleTitles[role].icon;
 
   return (
-    <aside className="w-64 shrink-0 border-r border-border bg-surface/80 backdrop-blur-xs flex flex-col h-full min-h-[calc(100vh-4rem)]">
+    <aside
+      className={cn(
+        "w-64 shrink-0 border-r border-border bg-surface/80 backdrop-blur-xs flex flex-col h-full min-h-[calc(100vh-4rem)]",
+        className
+      )}
+    >
       {/* Header Info */}
       <div className="p-4 border-b border-border bg-white/50">
         <div className="flex items-center justify-between">
@@ -154,6 +172,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer",
                 isActive

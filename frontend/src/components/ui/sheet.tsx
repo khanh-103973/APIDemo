@@ -38,8 +38,8 @@ export function Sheet({
   if (!open) return null;
 
   const sideStyles = {
-    left: "inset-y-0 left-0 w-3/4 max-w-sm border-r",
-    right: "inset-y-0 right-0 w-3/4 max-w-sm border-l",
+    left: "inset-y-0 left-0 w-[85vw] max-w-sm border-r",
+    right: "inset-y-0 right-0 w-[85vw] max-w-sm border-l",
     bottom: "inset-x-0 bottom-0 max-h-[85vh] rounded-t-xl border-t",
   };
 
@@ -54,7 +54,7 @@ export function Sheet({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "fixed z-50 bg-background p-6 shadow-xl border-border transition-transform flex flex-col",
+          "fixed z-50 bg-background p-4 sm:p-6 shadow-xl border-border transition-transform flex flex-col",
           sideStyles[side]
         )}
       >

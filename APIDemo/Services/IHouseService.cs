@@ -1,14 +1,13 @@
 ﻿using APIDemo.DTOs;
 using APIDemo.DTOs.Common;
-using APIDemo.Models;
 
 namespace APIDemo.Services
 {
     public interface IHouseService
     {
-        Task<PageResult<House>> GetAllHousesAsync(HouseQueryParameters queryParams);
-        Task<House?> GetHouseByIdAsync(int id);
-        Task<House> CreateHouseAsync(HouseDto dto);
+        Task<PageResult<HouseResponseDto>> GetAllHousesAsync(HouseQueryParameters queryParams);
+        Task<HouseResponseDto?> GetHouseByIdAsync(int id);
+        Task<HouseResponseDto> CreateHouseAsync(HouseDto dto);
         Task<bool> UpdateHouseAsync(int id, HouseDto dto);
         Task<bool> DeleteHouseAsync(int id);
     }

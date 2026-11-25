@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 
 export interface ListingGalleryProps {
@@ -13,7 +14,7 @@ export function ListingGallery({ images, title }: ListingGalleryProps) {
 
   if (!images || images.length === 0) {
     return (
-      <div className="flex h-80 w-full items-center justify-center rounded-xl bg-muted text-muted-foreground">
+      <div className="flex h-64 sm:h-80 w-full items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <ImageIcon className="h-10 w-10" />
       </div>
     );
@@ -30,16 +31,18 @@ export function ListingGallery({ images, title }: ListingGalleryProps) {
   return (
     <div className="space-y-3">
       {/* Main Image Display */}
-      <div className="relative aspect-16/9 sm:aspect-21/9 w-full overflow-hidden rounded-xl bg-slate-900 shadow-md">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+      <div className="relative aspect-16/10 sm:aspect-21/9 w-full overflow-hidden rounded-xl bg-slate-900 shadow-md">
+        <Image
           src={images[selectedIndex]}
           alt={`${title} - hình ${selectedIndex + 1}`}
-          className="h-full w-full object-cover transition-opacity duration-200"
+          fill
+          priority={selectedIndex === 0}
+          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 92vw, 1216px"
+          className="object-cover transition-opacity duration-200"
         />
 
         {/* Gallery Counter */}
-        <div className="absolute bottom-3 right-3 rounded-md bg-slate-900/80 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-xs">
+        <div className="absolute bottom-3 right-3 z-10 rounded-md bg-slate-900/80 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-xs">
           {selectedIndex + 1} / {images.length}
         </div>
 
@@ -49,7 +52,7 @@ export function ListingGallery({ images, title }: ListingGalleryProps) {
             <button
               type="button"
               onClick={handlePrev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-800 shadow-sm backdrop-blur-xs transition hover:bg-white cursor-pointer"
+              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-800 shadow-sm backdrop-blur-xs transition hover:bg-white cursor-pointer"
               aria-label="Hình trước"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -57,7 +60,7 @@ export function ListingGallery({ images, title }: ListingGalleryProps) {
             <button
               type="button"
               onClick={handleNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-800 shadow-sm backdrop-blur-xs transition hover:bg-white cursor-pointer"
+              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-800 shadow-sm backdrop-blur-xs transition hover:bg-white cursor-pointer"
               aria-label="Hình kế tiếp"
             >
               <ChevronRight className="h-5 w-5" />
@@ -79,12 +82,14 @@ export function ListingGallery({ images, title }: ListingGalleryProps) {
                   ? "border-primary ring-2 ring-primary/20"
                   : "border-transparent opacity-70 hover:opacity-100"
               }`}
+              aria-label={`Xem hình ${idx + 1}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={img}
-                alt=""
-                className="h-full w-full object-cover"
+                alt={`${title} - ảnh thu nhỏ ${idx + 1}`}
+                fill
+                sizes="96px"
+                className="object-cover"
               />
             </button>
           ))}

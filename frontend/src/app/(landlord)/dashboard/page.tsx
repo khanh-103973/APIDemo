@@ -345,7 +345,12 @@ export default function LandlordDashboardPage() {
                 pendingViewings.map((viewing) => {
                   const listing = listings.find((l) => l.id === viewing.listingId);
                   const allKnownUsers = getAllUsers();
-                  const tenant =
+                  const tenant: {
+                    name?: string;
+                    fullName?: string;
+                    phone?: string;
+                    phoneNumber?: string;
+                  } =
                     allKnownUsers.find((u) => u.id === viewing.tenantId) ||
                     mockUsers.find((u) => u.id === viewing.tenantId) || {
                       fullName: "Nguyễn Văn Khang",
@@ -359,10 +364,10 @@ export default function LandlordDashboardPage() {
                       <div className="space-y-1.5 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-foreground text-sm">
-                            Khách thuê: {tenant.fullName || (tenant as any).name || "Khách thuê"}
+                            Khách thuê: {tenant.fullName || tenant.name || "Khách thuê"}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            (SĐT: {tenant.phoneNumber || (tenant as any).phone || "0912 345 678"})
+                            (SĐT: {tenant.phoneNumber || tenant.phone || "0912 345 678"})
                           </span>
                           <StatusBadge status={viewing.status} size="sm" />
                         </div>

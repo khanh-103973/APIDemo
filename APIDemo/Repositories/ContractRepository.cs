@@ -15,7 +15,13 @@ namespace APIDemo.Repositories
 
         public async Task<IEnumerable<Contract>> GetAllAsync(string? status)
         {
-            var query = _context.Contracts.AsNoTracking().AsQueryable();
+            var query = _context.Contracts
+                .AsNoTracking()
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.House)
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.User)
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status))
             {
@@ -23,7 +29,7 @@ namespace APIDemo.Repositories
                 query = query.Where(c => c.Status == normalizedStatus);
             }
 
-            return await query.ToListAsync();
+            return await query.OrderByDescending(c => c.Id).ToListAsync();
         }
 
         public async Task<IEnumerable<Contract>> GetAllForUserAsync(string? status, int userId, bool includeOwnedHouses)
@@ -32,6 +38,8 @@ namespace APIDemo.Repositories
                 .AsNoTracking()
                 .Include(c => c.Booking)
                     .ThenInclude(b => b!.House)
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.User)
                 .AsQueryable();
 
             if (includeOwnedHouses)
@@ -51,12 +59,12 @@ namespace APIDemo.Repositories
                 query = query.Where(c => c.Status == normalizedStatus);
             }
 
-            return await query.ToListAsync();
+            return await query.OrderByDescending(c => c.Id).ToListAsync();
         }
 
         public async Task<Contract?> GetByIdAsync(int id)
         {
-            return await _context.Contracts.FindAsync(id);
+            return await _context.Contracts.FirstOrDefaultAsync(c => c.Id == id);
         }
 
         public async Task<Contract?> GetByIdWithDetailsAsync(int id)
@@ -64,6 +72,8 @@ namespace APIDemo.Repositories
             return await _context.Contracts
                 .Include(c => c.Booking)
                     .ThenInclude(b => b!.House)
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.User)
                 .FirstOrDefaultAsync(c => c.Id == id);
         }
 
@@ -80,6 +90,8 @@ namespace APIDemo.Repositories
                 .AsNoTracking()
                 .Include(c => c.Booking)
                     .ThenInclude(b => b!.House)
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.User)
                 .FirstOrDefaultAsync(c => c.BookingId == bookingId);
         }
 
@@ -95,7 +107,9 @@ namespace APIDemo.Repositories
 
         public void Delete(Contract contract)
         {
-            _context.Contracts.Remove(contract);
+            contract.IsDeleted = true;
+            contract.DeletedAt = DateTime.UtcNow;
+            _context.Contracts.Update(contract);
         }
 
         public async Task<bool> SaveChangesAsync()

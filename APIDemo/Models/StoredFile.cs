@@ -8,6 +8,7 @@ namespace APIDemo.Models
         public required byte[] Content { get; set; }       // Dữ liệu nhị phân của file
         public long Length { get; set; }                   // Kích thước (bytes)
         public string FileHash { get; set; } = string.Empty; // Mã SHA-256 chống trùng lặp
+        public int? OwnerId { get; set; }                    // Chủ sở hữu file để chống IDOR
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     }
 }

@@ -1,7 +1,6 @@
 using APIDemo.DTOs;
 using APIDemo.DTOs.Common;
 using APIDemo.Exceptions;
-using APIDemo.Models;
 using APIDemo.Security;
 using APIDemo.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -22,7 +21,8 @@ namespace APIDemo.Controllers
 
         // 1. GET /api/houses (Công khai - Hỗ trợ Pagination, Filtering, Searching, Sorting)
         [HttpGet]
-        public async Task<ActionResult<PageResult<House>>> GetAll([FromQuery] HouseQueryParameters queryParams)
+        [ProducesResponseType(typeof(PageResult<HouseResponseDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<PageResult<HouseResponseDto>>> GetAll([FromQuery] HouseQueryParameters queryParams)
         {
             var result = await _houseService.GetAllHousesAsync(queryParams);
             return Ok(result);
@@ -30,7 +30,9 @@ namespace APIDemo.Controllers
 
         // 2. GET /api/houses/{id} (Công khai)
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetById(int id)
+        [ProducesResponseType(typeof(HouseResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<HouseResponseDto>> GetById(int id)
         {
             var house = await _houseService.GetHouseByIdAsync(id)
                 ?? throw new NotFoundException($"Không tìm thấy nhà cho thuê Id = {id}");
@@ -41,7 +43,8 @@ namespace APIDemo.Controllers
         // 3. POST /api/houses (Owner/Manager/Admin - ép OwnerId theo JWT nếu không phải Admin)
         [HttpPost]
         [Authorize(Roles = "Owner,Manager,Admin")]
-        public async Task<IActionResult> Create([FromBody] HouseDto dto)
+        [ProducesResponseType(typeof(HouseResponseDto), StatusCodes.Status201Created)]
+        public async Task<ActionResult<HouseResponseDto>> Create([FromBody] HouseDto dto)
         {
             var currentUserId = User.GetUserId();
             if (!User.IsAdmin())

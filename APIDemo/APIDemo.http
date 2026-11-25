@@ -1,6 +1,9 @@
 @APIDemo_HostAddress = http://localhost:5066
 
-GET {{APIDemo_HostAddress}}/weatherforecast/
+GET {{APIDemo_HostAddress}}/health
 Accept: application/json
 
 ###
+
+GET {{APIDemo_HostAddress}}/api/houses?pageNumber=1&pageSize=10
+Accept: application/json

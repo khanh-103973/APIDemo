@@ -21,7 +21,8 @@ namespace APIDemo.Controllers
 
         // 1. GET /api/bookings (Admin xem tất cả; Owner/Manager xem lịch nhà mình; Tenant chỉ xem lịch của mình)
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] string? status)
+        [ProducesResponseType(typeof(IEnumerable<BookingResponseDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<IEnumerable<BookingResponseDto>>> GetAll([FromQuery] string? status)
         {
             var bookings = await _bookingService.GetAllBookingsAsync(
                 status,
@@ -33,7 +34,8 @@ namespace APIDemo.Controllers
 
         // 2. GET /api/bookings/{id} (Kiểm tra quyền TenantId / House OwnerId / Admin)
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetById(int id)
+        [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
+        public async Task<ActionResult<BookingResponseDto>> GetById(int id)
         {
             var booking = await _bookingService.GetBookingByIdAsync(id, User.GetUserId(), User.IsAdmin())
                 ?? throw new NotFoundException($"Không tìm thấy lịch thuê nhà Id = {id}");
@@ -44,7 +46,8 @@ namespace APIDemo.Controllers
         // 3. POST /api/bookings (Yêu cầu >= 18 tuổi và không được giả mạo UserId người khác)
         [HttpPost]
         [Authorize(Policy = "AtLeast18")]
-        public async Task<IActionResult> Create([FromBody] BookingDto dto)
+        [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status201Created)]
+        public async Task<ActionResult<BookingResponseDto>> Create([FromBody] BookingDto dto)
         {
             var result = await _bookingService.CreateBookingAsync(dto, User.GetUserId(), User.IsAdmin());
             if (!result.IsSuccess)

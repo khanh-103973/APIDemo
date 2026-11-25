@@ -47,9 +47,9 @@ export default function LandlordListingsPage() {
 
   React.useEffect(() => {
     let active = true;
-    setListings(getLandlordListings());
     void fetchLandlordListingsFromApi().then((data) => {
-      if (active && data.length > 0) setListings(data);
+      if (!active) return;
+      setListings(data.length > 0 ? data : getLandlordListings());
     });
     return () => {
       active = false;

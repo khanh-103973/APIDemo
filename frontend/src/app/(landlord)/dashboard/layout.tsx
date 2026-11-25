@@ -1,8 +1,10 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { Home, Bell, PlusCircle, LogOut } from "lucide-react";
+import { Home, Bell, PlusCircle, LogOut, Menu } from "lucide-react";
 import { DashboardSidebar } from "@/components/shared/dashboard-sidebar";
+import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { useMockAuth } from "@/lib/auth/mock-auth";
@@ -15,6 +17,7 @@ export default function LandlordDashboardLayout({
 }) {
   const { user, logout } = useMockAuth();
   const router = useRouter();
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
 
   const handleLogout = () => {
     logout();
@@ -26,13 +29,21 @@ export default function LandlordDashboardLayout({
       <div className="min-h-screen flex flex-col bg-background">
         {/* Landlord Top Bar */}
         <header className="sticky top-0 z-40 w-full border-b border-border bg-white px-4 sm:px-6 shadow-xs">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+          <div className="flex h-16 items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="md:hidden rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer shrink-0"
+                aria-label="Mở menu chủ nhà"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <Link href="/" className="flex items-center gap-2 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
                   <Home className="h-4 w-4" />
                 </div>
-                <span className="font-heading text-lg font-bold">
+                <span className="font-heading text-base sm:text-lg font-bold truncate">
                   House<span className="text-primary">Rental</span>
                 </span>
               </Link>
@@ -42,7 +53,7 @@ export default function LandlordDashboardLayout({
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <Link href="/dashboard/listings/new">
                 <Button variant="accent" size="sm" className="gap-1.5 hidden sm:flex">
                   <PlusCircle className="h-4 w-4" />
@@ -73,6 +84,7 @@ export default function LandlordDashboardLayout({
                 onClick={handleLogout}
                 className="p-2 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                 title="Đăng xuất"
+                aria-label="Đăng xuất"
               >
                 <LogOut className="h-4 w-4" />
               </button>
@@ -81,14 +93,28 @@ export default function LandlordDashboardLayout({
         </header>
 
         {/* Main Layout Area */}
-        <div className="flex-1 flex w-full">
+        <div className="flex-1 flex w-full min-w-0">
           <div className="hidden md:block">
             <DashboardSidebar role="landlord" />
           </div>
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-surface/50 overflow-y-auto">
+          <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 bg-surface/50 overflow-y-auto">
             {children}
           </main>
         </div>
+
+        {/* Mobile Landlord Drawer */}
+        <Sheet
+          open={mobileNavOpen}
+          onOpenChange={setMobileNavOpen}
+          side="left"
+          title="Khu Vực Chủ Nhà"
+        >
+          <DashboardSidebar
+            role="landlord"
+            onNavigate={() => setMobileNavOpen(false)}
+            className="w-full border-r-0 min-h-0 bg-transparent"
+          />
+        </Sheet>
       </div>
     </RoleGuard>
   );

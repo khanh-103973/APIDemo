@@ -1,6 +1,10 @@
 import { Listing, ListingFilterParams } from "@/types";
 import { mockListings } from "@/mocks/listings";
-import { apiRequest, resolveBackendImageUrl } from "@/lib/api/client";
+import {
+  apiRequest,
+  BackendPageResult,
+  resolveBackendImageUrl,
+} from "@/lib/api/client";
 
 export const STORAGE_KEY_LISTINGS = "house_rental_listings";
 
@@ -15,14 +19,10 @@ export interface BackendHouse {
   imageUrl?: string;
   status: string;
   ownerId: number;
+  ownerName?: string | null;
 }
 
-export interface BackendPageResult<T> {
-  items: T[];
-  totalCount: number;
-  pageNumber: number;
-  pageSize: number;
-}
+export type { BackendPageResult };
 
 function normalizeVi(value: string): string {
   return value
@@ -88,9 +88,18 @@ export function mapHouseToListing(house: BackendHouse): Listing {
         ? "rented"
         : normalizedStatus === "maintenance"
         ? "hidden"
+        : normalizedStatus === "pending"
+        ? "pending"
+        : normalizedStatus === "rejected"
+        ? "rejected"
         : "active",
-    moderationStatus: "approved",
-    isFeatured: true,
+    moderationStatus:
+      normalizedStatus === "pending"
+        ? "pending"
+        : normalizedStatus === "rejected"
+        ? "rejected"
+        : "approved",
+    isFeatured: normalizedStatus === "available" || normalizedStatus === "rented",
     viewsCount: 120,
     createdAt: new Intl.DateTimeFormat("vi-VN").format(new Date()),
     updatedAt: new Intl.DateTimeFormat("vi-VN").format(new Date()),
@@ -161,10 +170,12 @@ export async function getListings(
       { skipAuth: true }
     );
     if (res && Array.isArray(res.items) && res.items.length > 0) {
-      let apiListings = res.items.map(mapHouseToListing);
+      let apiListings = res.items
+        .map(mapHouseToListing)
+        .filter((l) => l.status !== "pending" && l.status !== "rejected" && l.status !== "hidden");
       if (typeof window !== "undefined" && !filters?.query) {
         try {
-          localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(apiListings));
+          localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(res.items.map(mapHouseToListing)));
         } catch {}
       }
       if (filters?.city) {
@@ -292,7 +303,9 @@ export async function getFeaturedListings(): Promise<Listing[]> {
       { skipAuth: true }
     );
     if (res && Array.isArray(res.items) && res.items.length > 0) {
-      return res.items.map(mapHouseToListing);
+      return res.items
+        .map(mapHouseToListing)
+        .filter((l) => l.status !== "pending" && l.status !== "rejected" && l.status !== "hidden");
     }
   } catch {
     // Fall back to mock listings

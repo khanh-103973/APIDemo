@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Star, Quote, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
+import { Star, CheckCircle2 } from "lucide-react";
 
 interface Testimonial {
   name: string;
@@ -64,11 +65,12 @@ export function TestimonialsSection() {
 
           {/* User Profile */}
           <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={t.avatar}
               alt={t.name}
-              className="h-11 w-11 rounded-full object-cover border border-slate-200"
+              width={44}
+              height={44}
+              className="h-11 w-11 rounded-full object-cover border border-slate-200 shrink-0"
             />
             <div>
               <div className="flex items-center gap-1.5">

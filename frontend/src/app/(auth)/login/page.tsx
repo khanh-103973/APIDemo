@@ -13,6 +13,8 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
+  const reason = searchParams.get("reason");
+  const isSessionExpired = reason === "session_expired";
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -34,7 +36,7 @@ function LoginForm() {
     }
 
     setIsLoading(true);
-    const result = await loginWithApi(email, password);
+    const result = await loginWithApi(email, password, rememberMe);
     setIsLoading(false);
 
     if (!result.success || !result.user) {
@@ -63,6 +65,12 @@ function LoginForm() {
           Truy cập hệ thống quản lý phòng thuê và hồ sơ của bạn
         </p>
       </div>
+
+      {isSessionExpired && !error && (
+        <Alert variant="warning" title="Phiên đăng nhập đã hết hạn">
+          Phiên làm việc của bạn đã hết hạn hoặc không còn hợp lệ (401). Vui lòng đăng nhập lại để tiếp tục.
+        </Alert>
+      )}
 
       {error && (
         <Alert variant="danger" title="Lỗi đăng nhập">

@@ -15,7 +15,11 @@ namespace APIDemo.Repositories
 
         public async Task<IEnumerable<Booking>> GetAllAsync(string? status)
         {
-            var query = _context.Bookings.AsNoTracking().AsQueryable();
+            var query = _context.Bookings
+                .AsNoTracking()
+                .Include(b => b.House)
+                .Include(b => b.User)
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status))
             {
@@ -23,7 +27,7 @@ namespace APIDemo.Repositories
                 query = query.Where(b => b.Status == normalizedStatus);
             }
 
-            return await query.ToListAsync();
+            return await query.OrderByDescending(b => b.Id).ToListAsync();
         }
 
         public async Task<IEnumerable<Booking>> GetAllForUserAsync(string? status, int userId, bool includeOwnedHouses)
@@ -31,6 +35,7 @@ namespace APIDemo.Repositories
             var query = _context.Bookings
                 .AsNoTracking()
                 .Include(b => b.House)
+                .Include(b => b.User)
                 .AsQueryable();
 
             if (includeOwnedHouses)
@@ -48,19 +53,42 @@ namespace APIDemo.Repositories
                 query = query.Where(b => b.Status == normalizedStatus);
             }
 
-            return await query.ToListAsync();
+            return await query.OrderByDescending(b => b.Id).ToListAsync();
         }
 
         public async Task<Booking?> GetByIdAsync(int id)
         {
-            return await _context.Bookings.FindAsync(id);
+            return await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
         }
 
         public async Task<Booking?> GetByIdWithHouseAsync(int id)
         {
             return await _context.Bookings
                 .Include(b => b.House)
+                .Include(b => b.User)
                 .FirstOrDefaultAsync(b => b.Id == id);
+        }
+
+        public async Task<bool> HasOverlappingApprovedBookingAsync(
+            int houseId,
+            DateTime startDate,
+            DateTime endDate,
+            int? excludeBookingId = null)
+        {
+            var query = _context.Bookings
+                .AsNoTracking()
+                .Where(b =>
+                    b.HouseId == houseId &&
+                    (b.Status == "Approved" || b.Status == "Completed") &&
+                    b.StartDate < endDate &&
+                    b.EndDate > startDate);
+
+            if (excludeBookingId.HasValue)
+            {
+                query = query.Where(b => b.Id != excludeBookingId.Value);
+            }
+
+            return await query.AnyAsync();
         }
 
         public async Task AddAsync(Booking booking)
@@ -75,7 +103,9 @@ namespace APIDemo.Repositories
 
         public void Delete(Booking booking)
         {
-            _context.Bookings.Remove(booking);
+            booking.IsDeleted = true;
+            booking.DeletedAt = DateTime.UtcNow;
+            _context.Bookings.Update(booking);
         }
 
         public async Task<bool> SaveChangesAsync()

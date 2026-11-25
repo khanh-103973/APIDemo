@@ -16,13 +16,21 @@ const notoSans = Noto_Sans({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
-    template: "%s | House Rental System",
-    default: "House Rental System — Rental Marketplace & Property Management",
+    template: "%s | HouseRental",
+    default: "HouseRental — Nền tảng thuê phòng trọ, căn hộ & quản lý nhà cho thuê",
   },
   description:
-    "Vietnamese house rental marketplace and rental property management platform. Discover properties, manage rooms, contracts, and invoices.",
+    "Tìm kiếm phòng trọ, studio, căn hộ và nhà nguyên căn xác thực tại TP. Đà Nẵng và toàn quốc. Minh bạch chi phí, đặt lịch xem phòng trực tiếp và ký hợp đồng an toàn.",
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    siteName: "HouseRental",
+  },
 };
 
 export default function RootLayout({
@@ -38,7 +46,7 @@ export default function RootLayout({
     >
       <body
         suppressHydrationWarning
-        className="min-h-full flex flex-col font-sans bg-background text-foreground"
+        className="min-h-full flex flex-col font-sans bg-background text-foreground overflow-x-hidden"
       >
         {children}
       </body>

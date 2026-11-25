@@ -6,8 +6,13 @@ import { mockProperties } from "@/mocks/properties";
 import { mockViewingRequests } from "@/mocks/viewings";
 import { getMockCurrentUser } from "@/lib/auth/mock-auth";
 import { getAllInvoices } from "@/lib/api/invoices";
-import { apiRequest, getAuthToken, resolveBackendImageUrl } from "@/lib/api/client";
-import { fetchAllHousesFromApi } from "@/lib/api/listings";
+import {
+  apiRequest,
+  extractApiErrorMessage,
+  getAuthToken,
+  resolveBackendImageUrl,
+} from "@/lib/api/client";
+import { BackendHouse, fetchAllHousesFromApi, mapHouseToListing } from "@/lib/api/listings";
 
 const STORAGE_KEY_LISTINGS = "house_rental_listings";
 const STORAGE_KEY_VIEWINGS = "house_rental_viewings";
@@ -141,7 +146,71 @@ export async function uploadHouseImageToApi(file: File): Promise<string | null> 
 }
 
 /**
- * Save / Create a new listing
+ * Save / Create a new listing directly to ASP.NET Core POST /api/houses (awaits SQL Server persistence)
+ */
+export async function saveLandlordListingAsync(
+  data: Partial<Listing>
+): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+  if (!getAuthToken()) {
+    return {
+      success: false,
+      error: "Phiên đăng nhập chưa có JWT hoặc đã hết hạn. Vui lòng đăng nhập lại bằng tài khoản Chủ nhà.",
+    };
+  }
+
+  const currentUser = getMockCurrentUser();
+  const numericOwnerId = Number(data.landlordId || currentUser?.id);
+  const safeOwnerId = Number.isInteger(numericOwnerId) && numericOwnerId > 0 ? numericOwnerId : 1;
+
+  const fullAddress = [data.address, data.ward, data.district, data.city]
+    .filter((s) => Boolean(s && s.trim()))
+    .join(", ");
+
+  const rawImage = data.images && data.images.length > 0 ? data.images[0] : "";
+  const validImageUrl =
+    rawImage && /^https?:\/\/.+/.test(rawImage)
+      ? rawImage
+      : rawImage && rawImage.startsWith("/")
+      ? resolveBackendImageUrl(rawImage)
+      : "";
+
+  const backendStatus = data.status === "draft" ? "Maintenance" : "Pending";
+
+  try {
+    const created = await apiRequest<BackendHouse>("/houses", {
+      method: "POST",
+      body: JSON.stringify({
+        title: (data.title || "").trim(),
+        description: (data.description || "").trim(),
+        address: fullAddress || "Quận Hải Châu, TP. Đà Nẵng",
+        price: Number(data.rentPrice) || 4500000,
+        area: Number(data.area) || 25,
+        bedrooms: Math.max(1, Number(data.bedrooms) || 1),
+        imageUrl: validImageUrl,
+        status: backendStatus,
+        ownerId: safeOwnerId,
+      }),
+    });
+
+    const mapped = mapHouseToListing(created);
+    await fetchAllHousesFromApi();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("house_rental_listings_change"));
+    }
+    return { success: true, listing: mapped };
+  } catch (err) {
+    return {
+      success: false,
+      error: extractApiErrorMessage(
+        err,
+        "Không thể kết nối Backend API để lưu tin đăng. Vui lòng kiểm tra server đang chạy."
+      ),
+    };
+  }
+}
+
+/**
+ * Save / Create a new listing (legacy sync wrapper)
  */
 export function saveLandlordListing(data: Partial<Listing>): Listing {
   const allListings = getAllListingsFromStorage();
@@ -223,7 +292,7 @@ export function saveLandlordListing(data: Partial<Listing>): Listing {
         area: newListing.area,
         bedrooms: newListing.bedrooms,
         imageUrl: newListing.images[0] || "",
-        status: "Available",
+        status: "Pending",
         ownerId: numericOwnerId,
       }),
     }).catch(() => {});

@@ -1,6 +1,10 @@
 "use client";
 
-import { Invoice, PaymentRecord } from "@/types";
+/**
+ * NOTE: Mock/localStorage adapter — Backend chưa có bảng/API /api/invoices.
+ * Khi Backend bổ sung InvoicesController, thay thế các hàm này bằng apiRequest("/invoices").
+ */
+import { Invoice } from "@/types";
 import { mockInvoices } from "@/mocks/invoices";
 
 export const STORAGE_KEY_INVOICES = "house_rental_invoices";

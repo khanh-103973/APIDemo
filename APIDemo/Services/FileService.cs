@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
-using Microsoft.AspNetCore.Http;
+using APIDemo.Exceptions;
 using APIDemo.Models;
 using APIDemo.Repositories;
+using APIDemo.Security;
+using Microsoft.AspNetCore.Http;
 using static APIDemo.DTOs.FileUploadDbDto;
 
 namespace APIDemo.Services
@@ -10,7 +12,6 @@ namespace APIDemo.Services
     {
         private readonly IFileRepository _fileRepository;
 
-        // Danh sách đuôi file được phép upload (File Validation)
         private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".pdf", ".docx", ".txt", ".xlsx" };
         private const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
 
@@ -19,9 +20,8 @@ namespace APIDemo.Services
             _fileRepository = fileRepository;
         }
 
-        public async Task<FileResponseDto> UploadFileAsync(IFormFile file)
+        public async Task<FileResponseDto> UploadFileAsync(IFormFile file, int ownerId)
         {
-            // 1. VALIDATION CƠ BẢN
             if (file == null || file.Length == 0)
                 throw new ArgumentException("File rỗng hoặc không hợp lệ. Vui lòng chọn file.");
 
@@ -34,32 +34,37 @@ namespace APIDemo.Services
             if (string.IsNullOrEmpty(extension) || !_allowedExtensions.Contains(extension))
                 throw new ArgumentException($"Định dạng file '{extension}' không được hỗ trợ. Chỉ chấp nhận các định dạng: {string.Join(", ", _allowedExtensions)}.");
 
-            // 2. ĐỌC DỮ LIỆU FILE VÀ TÍNH DẤU VÂN TAY (MÃ BĂM SHA-256)
+            if ((extension == ".jpg" || extension == ".jpeg" || extension == ".png") &&
+                !await ImageFileValidator.HasValidImageMagicBytesAsync(file, extension))
+            {
+                throw new BadRequestException("Nội dung file ảnh không hợp lệ (sai chữ ký nhị phân JPEG/PNG).");
+            }
+
             using var memoryStream = new MemoryStream();
             await file.CopyToAsync(memoryStream);
             var contentBytes = memoryStream.ToArray();
 
-            using var sha256 = SHA256.Create();
-            var hashBytes = sha256.ComputeHash(contentBytes);
-            var fileHash = Convert.ToHexString(hashBytes);
+            var fileHash = Convert.ToHexString(SHA256.HashData(contentBytes));
 
-            // 3. KIỂM TRA TRÙNG LẶP NỘI DUNG (FILE CHƯA SỬA MÀ TẢI LÊN LẦN 2)
             var duplicateByHash = await _fileRepository.GetByHashAsync(fileHash);
             if (duplicateByHash != null)
             {
                 throw new InvalidOperationException($"File này đã tồn tại trên hệ thống (trùng nội dung 100% với file '{duplicateByHash.FileName}', Id: {duplicateByHash.Id}). Không thể tải lên lại lần 2!");
             }
 
-            // 4. XỬ LÝ TRƯỜNG HỢP: ĐÃ SỬA NỘI DUNG FILE A VÀ ĐẨY LÊN LẠI CÙNG TÊN
             var existingByName = await _fileRepository.GetByFileNameAsync(fileName);
             if (existingByName != null)
             {
-                // Vì ở bước 3 Hash không trùng -> nội dung file A ĐÃ ĐƯỢC CHỈNH SỬA
-                // Hệ thống sẽ cho phép cập nhật nội dung mới vào file A thay vì chặn oan!
+                if (existingByName.OwnerId.HasValue && existingByName.OwnerId.Value != ownerId)
+                {
+                    throw new ForbiddenException("Bạn không có quyền ghi đè file của người dùng khác.");
+                }
+
                 existingByName.Content = contentBytes;
                 existingByName.ContentType = file.ContentType;
                 existingByName.Length = file.Length;
                 existingByName.FileHash = fileHash;
+                existingByName.OwnerId = ownerId;
                 existingByName.UploadedAt = DateTime.UtcNow;
 
                 _fileRepository.Update(existingByName);
@@ -74,7 +79,6 @@ namespace APIDemo.Services
                 };
             }
 
-            // 5. TRƯỜNG HỢP FILE HOÀN TOÀN MỚI
             var newFile = new StoredFile
             {
                 FileName = fileName,
@@ -82,6 +86,7 @@ namespace APIDemo.Services
                 Content = contentBytes,
                 Length = file.Length,
                 FileHash = fileHash,
+                OwnerId = ownerId,
                 UploadedAt = DateTime.UtcNow
             };
 
@@ -96,10 +101,16 @@ namespace APIDemo.Services
             };
         }
 
-        public async Task<FileDownloadDto?> GetFileForDownloadAsync(int id)
+        public async Task<FileDownloadDto?> GetFileForDownloadAsync(int id, int currentUserId, bool isAdmin)
         {
             var file = await _fileRepository.GetByIdAsync(id);
             if (file == null) return null;
+
+            // Chặn IDOR trên StoredFiles: chỉ Admin hoặc chính chủ sở hữu file mới được tải xuống
+            if (!isAdmin && file.OwnerId != currentUserId)
+            {
+                throw new ForbiddenException("Bạn không có quyền tải xuống tài liệu thuộc sở hữu của người dùng khác.");
+            }
 
             return new FileDownloadDto
             {

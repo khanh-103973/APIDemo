@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Heart, Trash2, Calendar, MapPin, Search } from "lucide-react";
 import { Listing } from "@/types";
-import { getFavoriteListings, toggleMockFavorite } from "@/lib/auth/mock-auth";
+import { getMockFavorites, toggleMockFavorite } from "@/lib/auth/mock-auth";
+import { fetchAllHousesFromApi } from "@/lib/api/listings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -15,12 +17,29 @@ import { ViewingModal } from "@/components/listing/viewing-modal";
 
 export default function TenantFavoritesPage() {
   const router = useRouter();
-  const [favorites, setFavorites] = React.useState<Listing[]>(getFavoriteListings);
+  const [allListings, setAllListings] = React.useState<Listing[]>([]);
+  const [favoriteIds, setFavoriteIds] = React.useState<string[]>([]);
   const [selectedViewingListing, setSelectedViewingListing] = React.useState<Listing | null>(null);
 
+  React.useEffect(() => {
+    let active = true;
+    void fetchAllHousesFromApi().then((houses) => {
+      if (!active) return;
+      setFavoriteIds(getMockFavorites());
+      if (houses) {
+        setAllListings(houses.filter((h) => h.status !== "pending" && h.status !== "rejected"));
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const favorites = allListings.filter((l) => favoriteIds.includes(l.id));
+
   const handleRemoveFavorite = (id: string) => {
-    toggleMockFavorite(id);
-    setFavorites(getFavoriteListings());
+    const next = toggleMockFavorite(id);
+    setFavoriteIds(next);
   };
 
   return (
@@ -61,11 +80,12 @@ export default function TenantFavoritesPage() {
             <Card key={listing.id} className="overflow-hidden flex flex-col justify-between">
               <div>
                 <div className="aspect-16/9 relative overflow-hidden bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={listing.images[0]}
                     alt={listing.title}
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
                   />
                   <div className="absolute top-3 left-3">
                     <StatusBadge status={listing.status} />

@@ -35,7 +35,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format/currency";
-import { saveLandlordListing, uploadHouseImageToApi } from "@/lib/api/landlord";
+import { saveLandlordListingAsync, uploadHouseImageToApi } from "@/lib/api/landlord";
 import { PropertyType } from "@/types";
 
 // Curated sample property photos for 1-click selection
@@ -94,19 +94,21 @@ export default function NewListingWizardPage() {
   const [submittedStatus, setSubmittedStatus] = React.useState<"pending" | "draft">("pending");
   const [isUploadingImage, setIsUploadingImage] = React.useState<boolean>(false);
   const [uploadFeedback, setUploadFeedback] = React.useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = React.useState({
     // Step 1: Info & Address
     propertyId: "prop_1",
-    title: "Phòng Trọ Ban Công Thoáng Mát Đầy Đủ Tiện Nghi Mới 100%",
+    title: "Căn hộ / Nhà cho thuê gần trung tâm Đà Nẵng đầy đủ tiện nghi",
     propertyType: "boarding_house" as PropertyType,
-    city: "TP. Hồ Chí Minh",
-    district: "Quận Bình Thạnh",
-    ward: "Phường 25",
-    address: "48/12 Nguyễn Gia Trí (D2 cũ)",
+    city: "TP. Đà Nẵng",
+    district: "Quận Hải Châu",
+    ward: "Phường Hòa Cường Nam",
+    address: "33 Xô Viết Nghệ Tĩnh",
     description:
-      "Phòng trọ mới xây dựng, giờ giấc tự do không chung chủ, bảo vệ 24/7, thang máy di chuyển tiện lợi. Đầy đủ tiện nghi: máy lạnh inverter, tủ lạnh, gác lửng cao, ban công đón gió mát. Khu vực an ninh cao, thuận tiện đi lại sang Quận 1, Quận 2.",
+      "Nhà/phòng mới xây dựng, giờ giấc tự do không chung chủ, bảo vệ 24/7, khu dân cư an ninh gần Đại học Đông Á và trung tâm TP. Đà Nẵng. Đầy đủ tiện nghi: máy lạnh inverter, tủ lạnh, bếp riêng, ban công thoáng mát.",
 
     // Step 2: Images
     images: [
@@ -277,10 +279,13 @@ export default function NewListingWizardPage() {
     });
   };
 
-  // Submit action
-  const handleSubmit = (status: "pending" | "draft") => {
+  // Submit action (awaits real SQL Server POST /api/houses)
+  const handleSubmit = async (status: "pending" | "draft") => {
+    setSubmitError(null);
     setSubmittedStatus(status);
-    saveLandlordListing({
+    setIsSubmitting(true);
+
+    const result = await saveLandlordListingAsync({
       title: formData.title,
       description: formData.description,
       propertyType: formData.propertyType,
@@ -297,8 +302,14 @@ export default function NewListingWizardPage() {
       amenities: formData.amenities,
       images: formData.images,
       status: status,
-      moderationStatus: status === "draft" ? "pending" : "pending",
+      moderationStatus: "pending",
     });
+
+    setIsSubmitting(false);
+    if (!result.success) {
+      setSubmitError(result.error || "Không thể gửi tin đăng lên máy chủ. Vui lòng thử lại.");
+      return;
+    }
 
     setShowSuccessDialog(true);
   };
@@ -459,9 +470,9 @@ export default function NewListingWizardPage() {
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   className="w-full h-10 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 >
+                  <option value="TP. Đà Nẵng">TP. Đà Nẵng</option>
                   <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
                   <option value="Hà Nội">Hà Nội</option>
-                  <option value="Đà Nẵng">Đà Nẵng</option>
                 </select>
               </div>
 
@@ -472,7 +483,7 @@ export default function NewListingWizardPage() {
                 <Input
                   value={formData.district}
                   onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                  placeholder="VD: Quận Bình Thạnh"
+                  placeholder="VD: Quận Hải Châu"
                   className="text-xs"
                 />
                 {validationErrors.district && (
@@ -485,7 +496,7 @@ export default function NewListingWizardPage() {
                 <Input
                   value={formData.ward}
                   onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
-                  placeholder="VD: Phường 25"
+                  placeholder="VD: Phường Hòa Cường Nam"
                   className="text-xs"
                 />
               </div>
@@ -1097,6 +1108,13 @@ export default function NewListingWizardPage() {
         </div>
       )}
 
+      {/* Submit error banner */}
+      {submitError && (
+        <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+          <strong>Lỗi gửi tin đăng:</strong> {submitError}
+        </div>
+      )}
+
       {/* Wizard Navigation Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-border">
         {currentStep > 1 ? (
@@ -1105,6 +1123,7 @@ export default function NewListingWizardPage() {
             variant="outline"
             size="sm"
             onClick={handleBack}
+            disabled={isSubmitting}
             className="gap-1 cursor-pointer"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -1121,7 +1140,8 @@ export default function NewListingWizardPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => handleSubmit("draft")}
+                disabled={isSubmitting}
+                onClick={() => void handleSubmit("draft")}
                 className="cursor-pointer"
               >
                 Lưu bản nháp
@@ -1130,7 +1150,8 @@ export default function NewListingWizardPage() {
                 type="button"
                 variant="accent"
                 size="sm"
-                onClick={() => handleSubmit("pending")}
+                isLoading={isSubmitting}
+                onClick={() => void handleSubmit("pending")}
                 className="gap-1 shadow-xs cursor-pointer"
               >
                 <Check className="h-4 w-4" />

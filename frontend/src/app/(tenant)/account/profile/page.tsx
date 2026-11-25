@@ -26,16 +26,18 @@ export default function TenantProfilePage() {
     emergencyPhone: "0903112233",
   });
 
-  React.useEffect(() => {
-    if (user) {
-      setForm((prev) => ({
-        ...prev,
-        name: user.name || prev.name,
-        email: user.email || prev.email,
-        phone: user.phone || prev.phone,
-      }));
-    }
-  }, [user]);
+  const [syncedUserId, setSyncedUserId] = React.useState<string | null>(
+    user?.id ?? null
+  );
+  if (user && user.id !== syncedUserId) {
+    setSyncedUserId(user.id);
+    setForm((prev) => ({
+      ...prev,
+      name: user.name || prev.name,
+      email: user.email || prev.email,
+      phone: user.phone || prev.phone,
+    }));
+  }
 
   const [notice, setNotice] = React.useState<string | null>(null);
 

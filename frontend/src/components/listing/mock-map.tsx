@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Navigation, ExternalLink } from "lucide-react";
 import { Listing } from "@/types";
@@ -11,6 +12,9 @@ export interface MockMapProps {
   selectedListingId?: string;
   onSelectListing?: (id: string) => void;
 }
+
+const FALLBACK_MAP_IMAGE =
+  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop&q=80";
 
 export function MockMap({
   listings,
@@ -24,27 +28,27 @@ export function MockMap({
   const activeListing = listings.find((l) => l.id === activeId) || listings[0];
 
   return (
-    <div className="relative w-full h-[600px] rounded-lg border border-border overflow-hidden bg-slate-100 flex flex-col">
+    <div className="relative w-full h-[500px] sm:h-[600px] rounded-lg border border-border overflow-hidden bg-slate-100 flex flex-col">
       {/* Map Mock Background Canvas with grid texture */}
       <div className="absolute inset-0 bg-[#e5e9f0] bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px] opacity-80" />
 
       {/* Mock Map UI Controls */}
-      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-md border border-border shadow-xs text-xs font-medium text-slate-700">
-        <Navigation className="h-3.5 w-3.5 text-primary" />
-        <span>Khu vực TP. Hồ Chí Minh (Chế độ mô phỏng bản đồ)</span>
+      <div className="absolute top-3 left-3 right-3 sm:right-auto z-10 flex items-center gap-2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-md border border-border shadow-xs text-xs font-medium text-slate-700">
+        <Navigation className="h-3.5 w-3.5 text-primary shrink-0" />
+        <span className="truncate">Khu vực TP. Đà Nẵng (Chế độ mô phỏng bản đồ)</span>
       </div>
 
       {/* Pins on the Map */}
       <div className="relative flex-1 w-full h-full">
         {listings.map((l, index) => {
           const isSelected = l.id === activeId;
-          // Deterministic pin positions for realistic mock distribution
           const topPercent = 25 + (index * 16) % 55;
           const leftPercent = 20 + (index * 22) % 65;
 
           return (
-            <div
+            <button
               key={l.id}
+              type="button"
               style={{ top: `${topPercent}%`, left: `${leftPercent}%` }}
               className="absolute -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer"
               onClick={() => {
@@ -53,7 +57,7 @@ export function MockMap({
               }}
             >
               <div
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all duration-200 shadow-md ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all duration-200 shadow-md whitespace-nowrap ${
                   isSelected
                     ? "bg-primary text-primary-foreground scale-110 ring-4 ring-primary/30 z-30"
                     : "bg-white text-slate-800 hover:bg-slate-50 border border-slate-300"
@@ -62,21 +66,22 @@ export function MockMap({
                 <MapPin className="h-3.5 w-3.5 shrink-0" />
                 <span>{formatVND(l.rentPrice).replace(" ₫", "đ")}</span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
       {/* Active Pin Floating Card */}
       {activeListing && (
-        <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-30 bg-white p-3.5 rounded-lg border border-border shadow-lg animate-in fade-in-50 slide-in-from-bottom-2 duration-150">
+        <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-auto sm:right-4 sm:w-80 z-30 bg-white p-3.5 rounded-lg border border-border shadow-lg animate-in fade-in-50 slide-in-from-bottom-2 duration-150">
           <div className="flex gap-3">
-            <div className="w-20 h-20 rounded-md overflow-hidden bg-muted shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={activeListing.images[0]}
+            <div className="relative w-20 h-20 rounded-md overflow-hidden bg-muted shrink-0">
+              <Image
+                src={activeListing.images[0] || FALLBACK_MAP_IMAGE}
                 alt={activeListing.title}
-                className="w-full h-full object-cover"
+                fill
+                sizes="80px"
+                className="object-cover"
               />
             </div>
             <div className="flex-1 min-w-0">

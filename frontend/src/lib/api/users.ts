@@ -4,7 +4,12 @@ import {
   mockLandlordProfiles,
   mockTenantProfiles,
 } from "@/mocks/users";
-import { apiRequest, getAuthToken } from "@/lib/api/client";
+import {
+  apiRequest,
+  BackendPageResult,
+  extractApiErrorMessage,
+  getAuthToken,
+} from "@/lib/api/client";
 
 export interface BackendUserDto {
   id: number;
@@ -15,15 +20,11 @@ export interface BackendUserDto {
   role: string;
   department?: string;
   dateOfBirth?: string;
+  isActive?: boolean;
   createdAt?: string;
 }
 
-interface BackendUsersPage {
-  items: BackendUserDto[];
-  totalCount: number;
-  pageNumber: number;
-  pageSize: number;
-}
+type BackendUsersPage = BackendPageResult<BackendUserDto>;
 
 function mapRole(role?: string): UserRole {
   const r = (role || "").toLowerCase();
@@ -43,7 +44,7 @@ export function mapBackendUser(u: BackendUserDto): User {
     phone,
     phoneNumber: phone,
     role: mapRole(u.role),
-    status: "active",
+    status: u.isActive === false ? "suspended" : "active",
     avatar:
       "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
     createdAt: u.createdAt
@@ -141,12 +142,76 @@ export async function getUsers(): Promise<User[]> {
       const res = await apiRequest<BackendUsersPage>(
         "/users?pageNumber=1&pageSize=100"
       );
-      if (res && Array.isArray(res.items) && res.items.length > 0) {
+      if (res && Array.isArray(res.items)) {
         return res.items.map(mapBackendUser);
       }
     } catch {
-      // Fallback to mock users when unauthorized or offline
+      // Fallback to mock users only when offline or non-admin
     }
   }
   return [...mockUsers];
+}
+
+/**
+ * Update the authenticated user's profile via PUT /api/users/{id}.
+ */
+export async function updateUserProfileOnApi(
+  userId: string,
+  payload: {
+    username: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    password?: string;
+    dateOfBirth?: string;
+  }
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const numericId = Number(userId);
+  if (!getAuthToken() || !Number.isInteger(numericId) || numericId <= 0) {
+    return {
+      success: false,
+      error: "Vui lòng đăng nhập tài khoản hợp lệ để cập nhật hồ sơ.",
+    };
+  }
+
+  try {
+    const res = await apiRequest<{ message?: string }>(`/users/${numericId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    return {
+      success: true,
+      message: res?.message || "Cập nhật hồ sơ thành công.",
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: extractApiErrorMessage(err, "Không thể cập nhật hồ sơ lên máy chủ."),
+    };
+  }
+}
+
+/**
+ * Change password via POST /api/auth/change-password (revokes all old refresh tokens).
+ */
+export async function changePasswordOnApi(payload: {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await apiRequest<{ message?: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return {
+      success: true,
+      message: res?.message || "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.",
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: extractApiErrorMessage(err, "Không thể đổi mật khẩu."),
+    };
+  }
 }

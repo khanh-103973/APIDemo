@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, Mail, Phone, MapPin, ShieldCheck, CheckCircle2, Smartphone, CreditCard } from "lucide-react";
+import { Home, Mail, Phone, MapPin, ShieldCheck, CheckCircle2 } from "lucide-react";
 
 export function Footer() {
   return (
@@ -128,7 +128,7 @@ export function Footer() {
               <span className="text-[11px] text-slate-500 uppercase tracking-wider block mb-1.5 font-semibold">
                 Hỗ trợ thanh toán an toàn
               </span>
-              <div className="flex items-center gap-2 text-xs text-slate-300">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
                 <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 font-semibold">
                   VietQR
                 </span>
@@ -144,9 +144,9 @@ export function Footer() {
         </div>
 
         {/* Bottom copyright & legal */}
-        <div className="mt-12 border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="mt-12 border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 text-center sm:text-left">
           <p>© 2026 House Rental System Vietnam. Toàn quyền sở hữu.</p>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <Link href="/terms" className="hover:text-slate-300 transition-colors">
               Quy chế hoạt động sàn
             </Link>

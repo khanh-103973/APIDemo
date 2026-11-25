@@ -39,9 +39,11 @@ export default function LandlordRoomsPage() {
     mockRooms.filter((r) => propertyIds.has(r.propertyId))
   );
 
-  React.useEffect(() => {
+  const [prevLandlordId, setPrevLandlordId] = React.useState(landlordId);
+  if (landlordId !== prevLandlordId) {
+    setPrevLandlordId(landlordId);
     setRooms(mockRooms.filter((r) => propertyIds.has(r.propertyId)));
-  }, [propertyIds]);
+  }
 
   const [propertyFilter, setPropertyFilter] = React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
@@ -222,7 +224,7 @@ export default function LandlordRoomsPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Khách thuê:</span>
                   <span className="font-semibold text-foreground truncate max-w-[120px]">
-                    {tenant ? tenant.fullName || (tenant as any).name : "—"}
+                    {tenant ? tenant.fullName || tenant.name : "—"}
                   </span>
                 </div>
               </div>

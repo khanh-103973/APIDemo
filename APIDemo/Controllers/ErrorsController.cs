@@ -1,13 +1,15 @@
 using APIDemo.Exceptions;
+using APIDemo.Filters;
 using Microsoft.AspNetCore.Mvc;
 
 namespace APIDemo.Controllers
 {
     /// <summary>
-    /// Endpoint dùng để kiểm tra Exception Middleware. Có thể xóa khi không cần demo.
+    /// Endpoint dùng để kiểm tra Exception Middleware (chỉ hoạt động ở môi trường Development).
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
+    [DevelopmentOnly]
     public class ErrorsController : ControllerBase
     {
         [HttpGet("bad-request")]

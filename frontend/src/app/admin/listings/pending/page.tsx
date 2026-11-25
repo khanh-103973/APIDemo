@@ -11,6 +11,7 @@ import {
   Check,
   MapPin,
   ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +24,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format/currency";
-import { getAdminListings, fetchAdminListingsFromApi, moderateAdminListing } from "@/lib/api/admin";
+import { fetchAdminListingsFromApi, moderateAdminListingAsync } from "@/lib/api/admin";
 import { mockUsers } from "@/mocks/users";
 import { Listing } from "@/types";
 
@@ -34,12 +35,22 @@ export default function AdminPendingListingsPage() {
   const [requestingChangesListing, setRequestingChangesListing] = React.useState<Listing | null>(null);
   const [changeNotes, setChangeNotes] = React.useState<string>("Vui lòng bổ sung thêm ảnh khu vực nhà vệ sinh và chốt rõ tiền cọc.");
   const [notice, setNotice] = React.useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = React.useState<boolean>(false);
+
+  const refreshPending = React.useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const data = await fetchAdminListingsFromApi();
+      setListings(data);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     let active = true;
-    setListings(getAdminListings());
     void fetchAdminListingsFromApi().then((data) => {
-      if (active && data.length > 0) setListings(data);
+      if (active) setListings(data);
     });
     return () => {
       active = false;
@@ -55,23 +66,23 @@ export default function AdminPendingListingsPage() {
     (l) => l.moderationStatus === "pending" || l.status === "pending"
   );
 
-  const handleApprove = (id: string) => {
-    const updated = moderateAdminListing(id, "approved", "Đã kiểm duyệt đạt chuẩn chất lượng và tính xác thực");
+  const handleApprove = async (item: Listing) => {
+    const updated = await moderateAdminListingAsync(item, "approved", "Đã kiểm duyệt đạt chuẩn chất lượng và tính xác thực");
     setListings(updated);
     showNotification("Đã phê duyệt xuất bản tin đăng thành công! Tin hiện đã hiển thị công khai.");
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectingListing) return;
-    const updated = moderateAdminListing(rejectingListing.id, "rejected", rejectReason);
+    const updated = await moderateAdminListingAsync(rejectingListing, "rejected", rejectReason);
     setListings(updated);
     setRejectingListing(null);
     showNotification("Đã từ chối tin đăng vi phạm quy chuẩn kiểm duyệt.");
   };
 
-  const handleConfirmRequestChanges = () => {
+  const handleConfirmRequestChanges = async () => {
     if (!requestingChangesListing) return;
-    const updated = moderateAdminListing(requestingChangesListing.id, "changes_requested", changeNotes);
+    const updated = await moderateAdminListingAsync(requestingChangesListing, "changes_requested", changeNotes);
     setListings(updated);
     setRequestingChangesListing(null);
     showNotification("Đã gửi thông báo yêu cầu sửa đổi đến chủ nhà.");
@@ -79,13 +90,25 @@ export default function AdminPendingListingsPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-foreground">
-          Hàng Đợi Kiểm Duyệt Tin Đăng
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Kiểm định nghiêm ngặt tính xác thực, giá thuê và hình ảnh thực tế để bảo vệ người thuê khỏi lừa đảo.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-foreground">
+            Hàng Đợi Kiểm Duyệt Tin Đăng
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Kiểm định nghiêm ngặt tính xác thực, giá thuê và hình ảnh thực tế để bảo vệ người thuê khỏi lừa đảo.
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void refreshPending()}
+          className="gap-1.5 cursor-pointer self-start sm:self-center"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          Làm mới
+        </Button>
       </div>
 
       {notice && (
@@ -118,10 +141,15 @@ export default function AdminPendingListingsPage() {
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
             Tất cả các tin đăng gửi lên đã được xử lý xong. Hệ thống sẽ tự động cập nhật khi có tin đăng mới.
           </p>
-          <div className="pt-2">
+          <div className="pt-2 flex items-center justify-center gap-2 flex-wrap">
             <Link href="/admin/listings">
               <Button variant="outline" size="sm" className="text-xs">
                 Xem tất cả tin trên sàn
+              </Button>
+            </Link>
+            <Link href="/admin/bookings">
+              <Button variant="primary" size="sm" className="text-xs">
+                Xem lịch hẹn xem phòng
               </Button>
             </Link>
           </div>
@@ -273,7 +301,7 @@ export default function AdminPendingListingsPage() {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => handleApprove(item.id)}
+                      onClick={() => void handleApprove(item)}
                       className="text-xs gap-1 shadow-xs cursor-pointer"
                     >
                       <Check className="h-4 w-4" />

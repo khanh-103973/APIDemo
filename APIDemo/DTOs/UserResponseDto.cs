@@ -10,6 +10,7 @@ namespace APIDemo.DTOs
         public string Role { get; set; } = string.Empty;
         public string Department { get; set; } = string.Empty;
         public DateTime? DateOfBirth { get; set; }
+        public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; }
     }
 }

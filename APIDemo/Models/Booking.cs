@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace APIDemo.Models
 {
-    public class Booking
+    public class Booking : IAuditableSoftDelete
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -27,6 +27,11 @@ namespace APIDemo.Models
         [Required]
         [MaxLength(20)]
         public string Status { get; set; } = "Pending";
+
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
 
         [JsonIgnore]
         public User? User { get; set; }

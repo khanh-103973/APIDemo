@@ -8,17 +8,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace APIDemo.Controllers
 {
+    public class UpdateUserStatusDto
+    {
+        public bool IsActive { get; set; }
+    }
+
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
-        private readonly IAuthService _authService;
 
-        public UsersController(IUserService userService, IAuthService authService)
+        public UsersController(IUserService userService)
         {
             _userService = userService;
-            _authService = authService;
         }
 
         [HttpGet]
@@ -30,7 +34,6 @@ namespace APIDemo.Controllers
         }
 
         [HttpGet("{id:int}")]
-        [Authorize]
         public async Task<ActionResult<UserResponseDto>> GetById(int id)
         {
             var currentUserId = User.GetUserId();
@@ -45,18 +48,7 @@ namespace APIDemo.Controllers
             return Ok(user);
         }
 
-        [HttpPost("register")]
-        public async Task<ActionResult<UserResponseDto>> Register([FromBody] UserRegisterDto request)
-        {
-            var result = await _userService.RegisterAsync(request);
-            if (!result.IsSuccess)
-                throw new BadRequestException(result.Message);
-
-            return Ok(result.Data);
-        }
-
         [HttpPut("{id:int}")]
-        [Authorize]
         public async Task<IActionResult> Update(int id, [FromBody] UserRegisterDto request)
         {
             var currentUserId = User.GetUserId();
@@ -73,6 +65,30 @@ namespace APIDemo.Controllers
             return Ok(new { message = result.Message });
         }
 
+        /// <summary>
+        /// Khóa hoặc mở khóa tài khoản người dùng (Admin). Khi khóa sẽ thu hồi ngay toàn bộ Refresh Token.
+        /// </summary>
+        [HttpPatch("{id:int}/status")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateUserStatusDto dto)
+        {
+            if (id == User.GetUserId() && !dto.IsActive)
+            {
+                throw new BadRequestException("Không thể tự khóa tài khoản Admin đang đăng nhập.");
+            }
+
+            var result = await _userService.SetActiveStatusAsync(id, dto.IsActive);
+            if (!result.IsSuccess)
+            {
+                if (result.IsNotFound)
+                    throw new NotFoundException(result.Message);
+
+                throw new BadRequestException(result.Message);
+            }
+
+            return Ok(new { message = result.Message, isActive = dto.IsActive });
+        }
+
         [HttpDelete("{id:int}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
@@ -82,15 +98,6 @@ namespace APIDemo.Controllers
                 throw new NotFoundException(result.Message);
 
             return Ok(new { message = result.Message });
-        }
-
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDto dto)
-        {
-            var auth = await _authService.LoginAsync(dto)
-                ?? throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không chính xác.");
-
-            return Ok(auth);
         }
     }
 }

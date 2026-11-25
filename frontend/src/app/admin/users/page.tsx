@@ -18,7 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { getAdminUsers, fetchAdminUsersFromApi, toggleAdminUserStatus } from "@/lib/api/admin";
+import { getAdminUsers, fetchAdminUsersFromApi, toggleAdminUserStatusAsync } from "@/lib/api/admin";
 import { User } from "@/types";
 
 export default function AdminUsersPage() {
@@ -31,9 +31,9 @@ export default function AdminUsersPage() {
 
   React.useEffect(() => {
     let active = true;
-    setUsers(getAdminUsers());
     void fetchAdminUsersFromApi().then((data) => {
-      if (active && data.length > 0) setUsers(data);
+      if (!active) return;
+      setUsers(data.length > 0 ? data : getAdminUsers());
     });
     return () => {
       active = false;
@@ -45,13 +45,15 @@ export default function AdminUsersPage() {
     setTimeout(() => setNotice(null), 3500);
   };
 
-  const handleToggleStatus = (userId: string) => {
-    const updated = toggleAdminUserStatus(userId);
+  const handleToggleStatus = async (userId: string) => {
+    const current = users.find((u) => u.id === userId);
+    const nextIsActive = current?.status === "suspended";
+    const updated = await toggleAdminUserStatusAsync(userId, nextIsActive);
     setUsers(updated);
     const target = updated.find((u) => u.id === userId);
     showNotification(
       target?.status === "suspended"
-        ? `Đã tạm khóa tài khoản của ${target.name}.`
+        ? `Đã tạm khóa tài khoản của ${target.name} và thu hồi phiên đăng nhập.`
         : `Đã mở khóa hoạt động cho tài khoản ${target?.name}.`
     );
   };

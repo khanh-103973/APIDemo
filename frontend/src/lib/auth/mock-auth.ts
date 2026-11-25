@@ -7,17 +7,18 @@ import { mockListings } from "@/mocks/listings";
 import { mockViewingRequests } from "@/mocks/viewings";
 import {
   apiRequest,
-  ApiError,
-  clearAuthToken,
+  AUTH_EVENT_NAME,
+  clearStoredAuthSession,
+  extractApiErrorMessage,
   getAuthToken,
   setAuthToken,
+  STORAGE_KEY_JWT,
+  STORAGE_KEY_USER,
 } from "@/lib/api/client";
 
-const STORAGE_KEY_USER = "house_rental_mock_user";
 const STORAGE_KEY_REGISTERED_USERS = "house_rental_registered_users";
 const STORAGE_KEY_FAVORITES = "house_rental_mock_favorites";
 const STORAGE_KEY_VIEWINGS = "house_rental_viewings";
-const AUTH_EVENT_NAME = "house_rental_auth_change";
 
 interface BackendAuthUser {
   id: number;
@@ -118,9 +119,12 @@ export function getMockCurrentUser(): User | null {
   return null;
 }
 
-export function setMockCurrentUser(user: User | null): void {
+export function setMockCurrentUser(user: User | null, persist = true): void {
   if (typeof window === "undefined") return;
   try {
+    sessionStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_KEY_USER);
+
     if (user) {
       const allUsers = getAllUsers();
       const exists = allUsers.some(
@@ -138,23 +142,21 @@ export function setMockCurrentUser(user: User | null): void {
         } catch {}
       }
 
-      sessionStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-    } else {
-      sessionStorage.removeItem(STORAGE_KEY_USER);
-      localStorage.removeItem(STORAGE_KEY_USER);
+      const targetStorage = persist ? localStorage : sessionStorage;
+      targetStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
     }
     window.dispatchEvent(new Event(AUTH_EVENT_NAME));
   } catch {}
 }
 
 /**
- * Login against ASP.NET Core Web API (/api/auth/login) and persist JWT Bearer token.
- * Falls back to local mock users only when the backend server is unreachable.
+ * Login against ASP.NET Core Web API (/api/auth/login) and persist JWT Bearer token
+ * in a single storage (localStorage when rememberMe=true, sessionStorage when false).
  */
 export async function loginWithApi(
   usernameOrEmail: string,
-  password: string
+  password: string,
+  rememberMe = true
 ): Promise<{ success: boolean; user?: User; error?: string; viaApi?: boolean }> {
   const identifier = usernameOrEmail.trim();
   if (!identifier) {
@@ -175,9 +177,9 @@ export async function loginWithApi(
     });
 
     if (response?.token && response?.user) {
-      setAuthToken(response.token);
+      setAuthToken(response.token, rememberMe);
       const frontendUser = mapBackendUserToFrontend(response.user);
-      setMockCurrentUser(frontendUser);
+      setMockCurrentUser(frontendUser, rememberMe);
       return { success: true, user: frontendUser, viaApi: true };
     }
     return {
@@ -185,12 +187,12 @@ export async function loginWithApi(
       error: "Không nhận được thông tin xác thực từ máy chủ.",
     };
   } catch (err) {
-    if (err instanceof ApiError) {
-      return { success: false, error: err.message };
-    }
     return {
       success: false,
-      error: "Không thể kết nối tới máy chủ Backend. Vui lòng kiểm tra API đang chạy.",
+      error: extractApiErrorMessage(
+        err,
+        "Không thể kết nối tới máy chủ Backend. Vui lòng kiểm tra API đang chạy."
+      ),
     };
   }
 }
@@ -226,35 +228,26 @@ export async function registerWithApi(payload: {
     });
 
     if (response?.token && response?.user) {
-      setAuthToken(response.token);
+      setAuthToken(response.token, true);
       const frontendUser = mapBackendUserToFrontend(response.user);
       frontendUser.phone = payload.phone.trim();
       frontendUser.phoneNumber = payload.phone.trim();
-      setMockCurrentUser(frontendUser);
+      setMockCurrentUser(frontendUser, true);
       return { success: true, user: frontendUser, viaApi: true };
     }
+    return {
+      success: false,
+      error: "Không nhận được thông tin đăng ký từ máy chủ.",
+    };
   } catch (err) {
-    if (err instanceof ApiError) {
-      return { success: false, error: err.message };
-    }
+    return {
+      success: false,
+      error: extractApiErrorMessage(
+        err,
+        "Không thể kết nối tới máy chủ Backend để đăng ký tài khoản."
+      ),
+    };
   }
-
-  // Fallback local session if backend is offline
-  const newUser: User = {
-    id: `usr_${Date.now()}`,
-    name: payload.fullName.trim(),
-    fullName: payload.fullName.trim(),
-    email: cleanEmail,
-    phone: payload.phone.trim(),
-    phoneNumber: payload.phone.trim(),
-    role: payload.role,
-    status: "active",
-    avatar:
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
-    createdAt: new Intl.DateTimeFormat("vi-VN").format(new Date()),
-  };
-  setMockCurrentUser(newUser);
-  return { success: true, user: newUser, viaApi: false };
 }
 
 export function loginWithEmail(email: string): {
@@ -291,61 +284,104 @@ export function loginWithEmail(email: string): {
 }
 
 export function logoutMockUser(): void {
-  clearAuthToken();
-  setMockCurrentUser(null);
+  void apiRequest("/auth/logout", {
+    method: "POST",
+    skipAuth: true,
+    skipAutoLogout: true,
+  }).catch(() => {});
+  clearStoredAuthSession();
+  window.dispatchEvent(new Event(AUTH_EVENT_NAME));
 }
 
+let cachedAuthKey: string | null = null;
+let cachedAuthUser: User | null = null;
+
+function getClientAuthSnapshot(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw =
+      sessionStorage.getItem(STORAGE_KEY_USER) ||
+      localStorage.getItem(STORAGE_KEY_USER) ||
+      "";
+    const jwt = getAuthToken() || "";
+    const key = `${raw}::${jwt}`;
+    if (key === cachedAuthKey) {
+      return cachedAuthUser;
+    }
+    cachedAuthKey = key;
+    cachedAuthUser = getMockCurrentUser();
+    return cachedAuthUser;
+  } catch {
+    return null;
+  }
+}
+
+function getServerAuthSnapshot(): User | null {
+  return null;
+}
+
+function subscribeAuthStore(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const handleAuthChange = () => {
+    cachedAuthKey = null;
+    callback();
+  };
+
+  const handleStorageChange = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY_USER || e.key === STORAGE_KEY_JWT) {
+      if (!sessionStorage.getItem(STORAGE_KEY_USER)) {
+        cachedAuthKey = null;
+        callback();
+      }
+    }
+
+    if (e.key === "house_rental_viewings") {
+      window.dispatchEvent(new Event("house_rental_viewings_change"));
+    }
+    if (e.key === "house_rental_listings") {
+      window.dispatchEvent(new Event("house_rental_listings_change"));
+    }
+    if (e.key === "house_rental_invoices") {
+      window.dispatchEvent(new Event("house_rental_invoices_change"));
+    }
+  };
+
+  window.addEventListener(AUTH_EVENT_NAME, handleAuthChange);
+  window.addEventListener("storage", handleStorageChange);
+
+  return () => {
+    window.removeEventListener(AUTH_EVENT_NAME, handleAuthChange);
+    window.removeEventListener("storage", handleStorageChange);
+  };
+}
+
+const emptySubscribe = () => () => {};
+
 /**
- * React hook to observe authentication state across components
+ * React hook to observe authentication state across components without hydration mismatches
  */
 export function useMockAuth() {
-  const [user, setUser] = React.useState<User | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    setUser(getMockCurrentUser());
-    setIsLoading(false);
-
-    const handleAuthChange = () => {
-      setUser(getMockCurrentUser());
-    };
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY_USER) {
-        if (!sessionStorage.getItem(STORAGE_KEY_USER)) {
-          setUser(getMockCurrentUser());
-        }
-      }
-
-      if (e.key === "house_rental_viewings") {
-        window.dispatchEvent(new Event("house_rental_viewings_change"));
-      }
-      if (e.key === "house_rental_listings") {
-        window.dispatchEvent(new Event("house_rental_listings_change"));
-      }
-      if (e.key === "house_rental_invoices") {
-        window.dispatchEvent(new Event("house_rental_invoices_change"));
-      }
-    };
-
-    window.addEventListener(AUTH_EVENT_NAME, handleAuthChange);
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-      window.removeEventListener(AUTH_EVENT_NAME, handleAuthChange);
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, []);
+  const user = React.useSyncExternalStore(
+    subscribeAuthStore,
+    getClientAuthSnapshot,
+    getServerAuthSnapshot
+  );
+  const isHydrated = React.useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
   return {
     user,
-    isLoading,
+    isLoading: !isHydrated,
     login: loginWithEmail,
     loginWithApi,
     registerWithApi,
     logout: logoutMockUser,
     isAuthenticated: !!user,
-    token: getAuthToken(),
+    token: isHydrated ? getAuthToken() : null,
   };
 }
 
@@ -353,13 +389,25 @@ export function useMockAuth() {
    Favorites and Viewings Helpers
    ========================================================================= */
 
-const DEFAULT_FAVORITES = ["list_1", "list_2"];
+const DEFAULT_FAVORITES = ["house_1", "house_4"];
 
 export function getMockFavorites(): string[] {
   if (typeof window === "undefined") return DEFAULT_FAVORITES;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_FAVORITES);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed: string[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // Auto-migrate stale legacy HCMC mock defaults (list_1/list_2) to real Da Nang SQL Server houses
+        const hasOnlyLegacyDefaults =
+          parsed.length > 0 && parsed.every((id) => id.startsWith("list_"));
+        if (hasOnlyLegacyDefaults) {
+          localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify(DEFAULT_FAVORITES));
+          return DEFAULT_FAVORITES;
+        }
+        return parsed;
+      }
+    }
     localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify(DEFAULT_FAVORITES));
   } catch {}
   return DEFAULT_FAVORITES;

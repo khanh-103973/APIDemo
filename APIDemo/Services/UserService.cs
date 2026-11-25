@@ -10,10 +10,12 @@ namespace APIDemo.Services
     public class UserService : IUserService
     {
         private readonly IUserRepository _userRepo;
+        private readonly IAuthRepository _authRepo;
 
-        public UserService(IUserRepository userRepo)
+        public UserService(IUserRepository userRepo, IAuthRepository authRepo)
         {
             _userRepo = userRepo;
+            _authRepo = authRepo;
         }
 
         public async Task<PageResult<UserResponseDto>> GetAllAsync(UserQueryParameters queryParams)
@@ -118,6 +120,29 @@ namespace APIDemo.Services
             return (true, $"Cập nhật thành công người dùng Id = {id}");
         }
 
+        public async Task<(bool IsSuccess, bool IsNotFound, string Message)> SetActiveStatusAsync(int id, bool isActive)
+        {
+            var user = await _userRepo.GetByIdAsync(id);
+            if (user == null)
+            {
+                return (false, true, $"Không tìm thấy người dùng có Id = {id}");
+            }
+
+            user.IsActive = isActive;
+            _userRepo.Update(user);
+            await _userRepo.SaveChangesAsync();
+
+            if (!isActive)
+            {
+                // Thu hồi ngay lập tức toàn bộ Refresh Token của tài khoản bị khóa
+                await _authRepo.RevokeAllUserRefreshTokensAsync(id);
+            }
+
+            return (true, false, isActive
+                ? $"Đã mở khóa tài khoản Id = {id}."
+                : $"Đã khóa tài khoản Id = {id} và thu hồi toàn bộ phiên đăng nhập.");
+        }
+
         public async Task<(bool IsSuccess, string Message)> DeleteAsync(int id)
         {
             var user = await _userRepo.GetByIdAsync(id);
@@ -142,6 +167,7 @@ namespace APIDemo.Services
             Role = user.Role,
             Department = user.Department,
             DateOfBirth = user.DateOfBirth,
+            IsActive = user.IsActive,
             CreatedAt = user.CreatedAt
         };
     }
