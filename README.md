@@ -48,14 +48,17 @@ npm run dev
 ```
 Mở trình duyệt tại `http://localhost:3000`. Frontend sẽ tự kết nối tới Backend tại `http://localhost:5066/api` (có thể tùy chỉnh qua `frontend/.env.local` theo mẫu `frontend/.env.example`).
 
-## 3. Tài khoản mẫu dùng để Demo / Bảo vệ (Mật khẩu chung: `123456`)
+## 3. Tài khoản thật trong SQL Server (`.\SQLEXPRESS`, mật khẩu chung: `123456`)
 
 | Vai trò | Username | Email | Mật khẩu | Ghi chú |
 |---|---|---|---|---|
 | **Admin** | `admin` | `admin@rental.com` | `123456` | Toàn quyền quản trị (`Users`, `Houses`, `Contracts`) |
-| **Owner (Chủ nhà)** | `owner_nam` | `nam.owner@gmail.com` | `123456` | Tạo/sửa nhà cho thuê, quản lý hợp đồng |
-| **Tenant (>= 18 tuổi)** | `tenant_an` | `an.tenant@gmail.com` | `123456` | Đặt lịch thuê nhà (đạt Policy `AtLeast18`) |
-| **Tenant (< 18 tuổi)** | `tenant_tre_em` | `nhi.underage@gmail.com` | `123456` | Dùng để test chặn `403 Forbidden` với Policy `AtLeast18` |
+| **Chủ nhà / Quản lý** | `manager` | `manager@rental.com` | `123456` | Tạo/sửa nhà cho thuê, quản lý hợp đồng (`Manager`/`Owner`) |
+| **Khách thuê (>= 18 tuổi)** | `adult_user` | `adult@rental.com` | `123456` | Đặt lịch thuê nhà (đạt Policy `AtLeast18`) |
+| **Khách thuê (< 18 tuổi)** | `young_user` | `young@rental.com` | `123456` | Dùng để test chặn `403 Forbidden` với Policy `AtLeast18` |
+| **Nhân sự (HR)** | `hr_user` | `hr@rental.com` | `123456` | Test Policy `MustBeHR` |
+
+> *(Nếu chạy mới hoàn toàn với database trống / InMemoryDatabase, `DbInitializer` sẽ seed thêm `admin`, `owner_nam`, `owner_hoa`, `tenant_an`, `tenant_binh`, `tenant_tre_em` với mật khẩu `123456`.)*
 
 ## 4. Publish & Triển khai (Buổi 13)
 

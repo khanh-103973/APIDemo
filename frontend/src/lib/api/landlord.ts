@@ -6,6 +6,8 @@ import { mockProperties } from "@/mocks/properties";
 import { mockViewingRequests } from "@/mocks/viewings";
 import { getMockCurrentUser } from "@/lib/auth/mock-auth";
 import { getAllInvoices } from "@/lib/api/invoices";
+import { apiRequest, getAuthToken, resolveBackendImageUrl } from "@/lib/api/client";
+import { fetchAllHousesFromApi } from "@/lib/api/listings";
 
 const STORAGE_KEY_LISTINGS = "house_rental_listings";
 const STORAGE_KEY_VIEWINGS = "house_rental_viewings";
@@ -96,11 +98,46 @@ export function getLandlordListings(): Listing[] {
   const all = getAllListingsFromStorage();
   const currentUser = getMockCurrentUser();
   if (currentUser && currentUser.role === "landlord") {
-    return all.filter((l) => l.landlordId === currentUser.id);
+    const owned = all.filter((l) => l.landlordId === currentUser.id);
+    if (owned.length > 0) return owned;
   }
-  return all.filter(
-    (l) => l.landlordId === "usr_landlord_1" || l.landlordId === "usr_landlord_2"
-  );
+  return all;
+}
+
+/**
+ * Fetch real listings from ASP.NET Core /api/houses for the logged-in Owner/Admin.
+ */
+export async function fetchLandlordListingsFromApi(): Promise<Listing[]> {
+  const apiListings = await fetchAllHousesFromApi();
+  if (apiListings && apiListings.length > 0) {
+    const currentUser = getMockCurrentUser();
+    if (currentUser && currentUser.role === "landlord") {
+      const owned = apiListings.filter((l) => l.landlordId === currentUser.id);
+      return owned.length > 0 ? owned : apiListings;
+    }
+    return apiListings;
+  }
+  return getLandlordListings();
+}
+
+/**
+ * Upload house image to ASP.NET Core /api/files/upload-image (wwwroot/images).
+ */
+export async function uploadHouseImageToApi(file: File): Promise<string | null> {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await apiRequest<{ url?: string }>("/files/upload-image", {
+      method: "POST",
+      body: formData,
+    });
+    if (res?.url) {
+      return resolveBackendImageUrl(res.url);
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -170,6 +207,28 @@ export function saveLandlordListing(data: Partial<Listing>): Listing {
     } catch {}
   }
 
+  // Sync new house to ASP.NET Core POST /api/houses when authenticated with JWT
+  const numericOwnerId = Number(landlordId);
+  if (getAuthToken() && Number.isInteger(numericOwnerId) && numericOwnerId > 0) {
+    const fullAddress = [newListing.address, newListing.district, newListing.city]
+      .filter(Boolean)
+      .join(", ");
+    void apiRequest("/houses", {
+      method: "POST",
+      body: JSON.stringify({
+        title: newListing.title,
+        description: newListing.description,
+        address: fullAddress,
+        price: newListing.rentPrice,
+        area: newListing.area,
+        bedrooms: newListing.bedrooms,
+        imageUrl: newListing.images[0] || "",
+        status: "Available",
+        ownerId: numericOwnerId,
+      }),
+    }).catch(() => {});
+  }
+
   return newListing;
 }
 
@@ -178,6 +237,7 @@ export function saveLandlordListing(data: Partial<Listing>): Listing {
  */
 export function updateLandlordListingStatus(id: string, status: ListingStatus): Listing[] {
   const all = getAllListingsFromStorage();
+  const target = all.find((item) => item.id === id);
   const next = all.map((item) =>
     item.id === id
       ? {
@@ -198,6 +258,40 @@ export function updateLandlordListingStatus(id: string, status: ListingStatus): 
       window.dispatchEvent(new Event("house_rental_listings_change"));
     } catch {}
   }
+
+  // Sync status change to ASP.NET Core PUT /api/houses/{id}
+  const numericHouseId = Number(id.replace("house_", ""));
+  if (
+    target &&
+    getAuthToken() &&
+    Number.isInteger(numericHouseId) &&
+    numericHouseId > 0
+  ) {
+    const backendStatus =
+      status === "rented"
+        ? "Rented"
+        : status === "hidden"
+        ? "Maintenance"
+        : "Available";
+    const fullAddress = [target.address, target.district, target.city]
+      .filter(Boolean)
+      .join(", ");
+    void apiRequest(`/houses/${numericHouseId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title: target.title,
+        description: target.description,
+        address: fullAddress,
+        price: target.rentPrice,
+        area: target.area,
+        bedrooms: target.bedrooms,
+        imageUrl: target.images[0] || "",
+        status: backendStatus,
+        ownerId: Number(target.landlordId) || 2,
+      }),
+    }).catch(() => {});
+  }
+
   return getLandlordListings();
 }
 
@@ -213,6 +307,14 @@ export function deleteLandlordListing(id: string): Listing[] {
       window.dispatchEvent(new Event("house_rental_listings_change"));
     } catch {}
   }
+
+  const numericHouseId = Number(id.replace("house_", ""));
+  if (getAuthToken() && Number.isInteger(numericHouseId) && numericHouseId > 0) {
+    void apiRequest(`/houses/${numericHouseId}`, {
+      method: "DELETE",
+    }).catch(() => {});
+  }
+
   return getLandlordListings();
 }
 

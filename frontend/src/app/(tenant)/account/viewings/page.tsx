@@ -13,7 +13,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ViewingRequest, Listing } from "@/types";
-import { getMockTenantViewings, cancelMockViewing } from "@/lib/auth/mock-auth";
+import { getMockTenantViewings, cancelMockViewing, getMockCurrentUser } from "@/lib/auth/mock-auth";
+import { getViewingRequests } from "@/lib/api/viewings";
+import { fetchAllHousesFromApi } from "@/lib/api/listings";
 import { mockListings } from "@/mocks/listings";
 import { getAllListingsFromStorage } from "@/lib/api/landlord";
 import { Card } from "@/components/ui/card";
@@ -35,11 +37,20 @@ export default function TenantViewingsPage() {
   const [cancelTargetId, setCancelTargetId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    let active = true;
+    const current = getMockCurrentUser();
+    void fetchAllHousesFromApi();
+    void getViewingRequests({ tenantId: current?.id }).then((data) => {
+      if (active && data.length > 0) setViewings(data);
+    });
     const handleSync = () => {
       setViewings(getMockTenantViewings());
     };
     window.addEventListener("house_rental_viewings_change", handleSync);
-    return () => window.removeEventListener("house_rental_viewings_change", handleSync);
+    return () => {
+      active = false;
+      window.removeEventListener("house_rental_viewings_change", handleSync);
+    };
   }, []);
 
   const handleConfirmCancel = () => {

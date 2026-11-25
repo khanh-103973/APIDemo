@@ -37,18 +37,18 @@ namespace APIDemo.Controllers
             return Ok(house);
         }
 
-        // 3. POST /api/houses (Chỉ Chủ nhà - Owner hoặc Admin mới được đăng nhà)
+        // 3. POST /api/houses (Chỉ Chủ nhà - Owner/Manager hoặc Admin mới được đăng nhà)
         [HttpPost]
-        [Authorize(Roles = "Owner,Admin")]
+        [Authorize(Roles = "Owner,Manager,Admin")]
         public async Task<IActionResult> Create([FromBody] HouseDto dto)
         {
             var created = await _houseService.CreateHouseAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
-        // 4. PUT /api/houses/{id} (Chỉ Chủ nhà - Owner hoặc Admin mới được sửa thông tin nhà)
+        // 4. PUT /api/houses/{id} (Chỉ Chủ nhà - Owner/Manager hoặc Admin mới được sửa thông tin nhà)
         [HttpPut("{id:int}")]
-        [Authorize(Roles = "Owner,Admin")]
+        [Authorize(Roles = "Owner,Manager,Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] HouseDto dto)
         {
             var success = await _houseService.UpdateHouseAsync(id, dto);

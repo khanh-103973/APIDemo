@@ -196,19 +196,22 @@ namespace APIDemo.Data
                 }
             }
 
-            // 4. Tự động Seed Contracts (Quan hệ 1-1 với Booking đã Approved)
+            // 4. Tự động Seed Contracts (Quan hệ 1-1 với Booking)
             if (!context.Contracts.Any())
             {
-                var approvedBooking = context.Bookings.FirstOrDefault(b => b.Status == "Approved");
-                if (approvedBooking != null)
+                var targetBooking = context.Bookings.FirstOrDefault(b => b.Status == "Approved")
+                    ?? context.Bookings.FirstOrDefault();
+                if (targetBooking != null)
                 {
+                    var bookedHouse = context.Houses.FirstOrDefault(h => h.Id == targetBooking.HouseId);
+                    var monthlyRent = bookedHouse?.Price ?? 4500000;
                     var contract = new Contract
                     {
-                        BookingId = approvedBooking.Id,
-                        MonthlyRent = 9500000,
-                        Deposit = 19000000,
-                        StartDate = approvedBooking.StartDate,
-                        EndDate = approvedBooking.EndDate,
+                        BookingId = targetBooking.Id,
+                        MonthlyRent = monthlyRent,
+                        Deposit = monthlyRent * 2,
+                        StartDate = targetBooking.StartDate,
+                        EndDate = targetBooking.EndDate,
                         Status = "Active"
                     };
 

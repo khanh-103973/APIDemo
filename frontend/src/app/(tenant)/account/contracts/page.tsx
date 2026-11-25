@@ -15,15 +15,26 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format/currency";
+import { getContracts } from "@/lib/api/contracts";
 import { mockContracts } from "@/mocks/contracts";
 import { mockProperties, mockRooms } from "@/mocks/properties";
 import { Contract } from "@/types";
 
 export default function TenantContractsPage() {
   const [selectedContract, setSelectedContract] = React.useState<Contract | null>(null);
+  const [myContracts, setMyContracts] = React.useState<Contract[]>(() =>
+    mockContracts.filter((c) => c.tenantId === "usr_tenant_1")
+  );
 
-  // Contracts for tenant 1
-  const myContracts = mockContracts.filter((c) => c.tenantId === "usr_tenant_1");
+  React.useEffect(() => {
+    let active = true;
+    void getContracts({ tenantId: "usr_tenant_1" }).then((data) => {
+      if (active && data.length > 0) setMyContracts(data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">

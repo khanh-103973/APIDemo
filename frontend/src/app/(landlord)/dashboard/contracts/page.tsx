@@ -20,6 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format/currency";
+import { getContracts } from "@/lib/api/contracts";
 import { mockContracts } from "@/mocks/contracts";
 import { mockProperties, mockRooms } from "@/mocks/properties";
 import { mockUsers } from "@/mocks/users";
@@ -32,6 +33,16 @@ export default function LandlordContractsPage() {
   const [selectedContract, setSelectedContract] = React.useState<Contract | null>(null);
   const [showNewModal, setShowNewModal] = React.useState<boolean>(false);
   const [notice, setNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    void getContracts().then((data) => {
+      if (active && data.length > 0) setContracts(data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // New contract form state
   const [newCt, setNewCt] = React.useState({

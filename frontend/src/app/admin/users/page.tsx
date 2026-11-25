@@ -18,7 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { getAdminUsers, toggleAdminUserStatus } from "@/lib/api/admin";
+import { getAdminUsers, fetchAdminUsersFromApi, toggleAdminUserStatus } from "@/lib/api/admin";
 import { User } from "@/types";
 
 export default function AdminUsersPage() {
@@ -28,6 +28,16 @@ export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    void fetchAdminUsersFromApi().then((data) => {
+      if (active && data.length > 0) setUsers(data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const showNotification = (msg: string) => {
     setNotice(msg);

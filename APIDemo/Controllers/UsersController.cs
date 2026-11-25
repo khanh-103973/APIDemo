@@ -49,7 +49,7 @@ namespace APIDemo.Controllers
         }
 
         [HttpPut("{id:int}")]
-        [Authorize(Roles = "Admin,Owner")]
+        [Authorize(Roles = "Admin,Owner,Manager")]
         public async Task<IActionResult> Update(int id, [FromBody] UserRegisterDto request)
         {
             var result = await _userService.UpdateAsync(id, request);

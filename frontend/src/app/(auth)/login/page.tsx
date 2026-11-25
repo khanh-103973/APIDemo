@@ -148,32 +148,32 @@ function LoginForm() {
         </Button>
       </form>
 
-      {/* Quick Login Helpers (Synced with Backend Seed Data) */}
+      {/* Quick Login Helpers (Synced with Real SQL Server APIDemo Database) */}
       <div className="pt-4 border-t border-border space-y-2">
         <span className="text-xs font-semibold text-muted-foreground block text-center">
-          Tài khoản mẫu (Backend Seed Data - mật khẩu 123456):
+          Tài khoản thật trong SQL Server (mật khẩu: 123456):
         </span>
         <div className="flex flex-col gap-1.5">
           <button
             type="button"
-            onClick={() => handleSelectQuickAccount("tenant_an", "123456")}
+            onClick={() => handleSelectQuickAccount("adult_user", "123456")}
             className="flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium bg-surface hover:bg-slate-200/70 border border-border text-foreground transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2">
               <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Khách thuê: <strong>tenant_an</strong></span>
+              <span>Khách thuê: <strong>adult_user</strong> (adult@rental.com)</span>
             </div>
             <span className="text-[10px] text-muted-foreground">Điền sẵn</span>
           </button>
 
           <button
             type="button"
-            onClick={() => handleSelectQuickAccount("owner_nam", "123456")}
+            onClick={() => handleSelectQuickAccount("manager", "123456")}
             className="flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium bg-surface hover:bg-slate-200/70 border border-border text-foreground transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2">
               <Building className="h-3.5 w-3.5 text-purple-600" />
-              <span>Chủ nhà: <strong>owner_nam</strong></span>
+              <span>Chủ nhà / Quản lý: <strong>manager</strong> (manager@rental.com)</span>
             </div>
             <span className="text-[10px] text-muted-foreground">Điền sẵn</span>
           </button>
@@ -185,7 +185,7 @@ function LoginForm() {
           >
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
-              <span>Admin: <strong>admin</strong></span>
+              <span>Admin: <strong>admin</strong> (admin@rental.com)</span>
             </div>
             <span className="text-[10px] text-muted-foreground">Điền sẵn</span>
           </button>

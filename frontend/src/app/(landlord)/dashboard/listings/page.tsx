@@ -30,6 +30,7 @@ import {
 import { formatVND } from "@/lib/format/currency";
 import {
   getLandlordListings,
+  fetchLandlordListingsFromApi,
   updateLandlordListingStatus,
   deleteLandlordListing,
 } from "@/lib/api/landlord";
@@ -43,6 +44,16 @@ export default function LandlordListingsPage() {
   const [viewMode, setViewMode] = React.useState<"table" | "grid">("table");
   const [listingToDelete, setListingToDelete] = React.useState<Listing | null>(null);
   const [actionNotice, setActionNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    void fetchLandlordListingsFromApi().then((data) => {
+      if (active && data.length > 0) setListings(data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const showNotification = (msg: string) => {
     setActionNotice(msg);

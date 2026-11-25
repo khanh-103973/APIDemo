@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { formatVND } from "@/lib/format/currency";
 import {
   getAdminListings,
+  fetchAdminListingsFromApi,
   toggleListingFeatured,
 } from "@/lib/api/admin";
 import { Listing } from "@/types";
@@ -27,6 +28,16 @@ export default function AdminListingsPage() {
   const [cityFilter, setCityFilter] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [notice, setNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    void fetchAdminListingsFromApi().then((data) => {
+      if (active && data.length > 0) setListings(data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const showNotification = (msg: string) => {
     setNotice(msg);

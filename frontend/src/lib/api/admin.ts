@@ -4,6 +4,8 @@ import { User, Listing, ActivityLog, ListingStatus, ModerationStatus, UserStatus
 import { mockUsers } from "@/mocks/users";
 import { mockListings } from "@/mocks/listings";
 import { getAllUsers } from "@/lib/auth/mock-auth";
+import { getUsers } from "@/lib/api/users";
+import { fetchAllHousesFromApi } from "@/lib/api/listings";
 
 const STORAGE_KEY_ADMIN_USERS = "house_rental_admin_users";
 const STORAGE_KEY_ADMIN_LISTINGS = "house_rental_listings";
@@ -171,6 +173,35 @@ export function getAdminUsers(): User[] {
     localStorage.setItem(STORAGE_KEY_ADMIN_USERS, JSON.stringify(allKnown));
   } catch {}
   return allKnown;
+}
+
+/**
+ * Fetch real users from ASP.NET Core GET /api/users (requires Admin JWT)
+ */
+export async function fetchAdminUsersFromApi(): Promise<User[]> {
+  try {
+    const apiUsers = await getUsers();
+    if (apiUsers && apiUsers.length > 0 && apiUsers.some((u) => /^\d+$/.test(u.id))) {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(STORAGE_KEY_ADMIN_USERS, JSON.stringify(apiUsers));
+        } catch {}
+      }
+      return apiUsers;
+    }
+  } catch {}
+  return getAdminUsers();
+}
+
+/**
+ * Fetch real listings from ASP.NET Core GET /api/houses
+ */
+export async function fetchAdminListingsFromApi(): Promise<Listing[]> {
+  const apiListings = await fetchAllHousesFromApi();
+  if (apiListings && apiListings.length > 0) {
+    return apiListings;
+  }
+  return getAdminListings();
 }
 
 export function toggleAdminUserStatus(userId: string): User[] {

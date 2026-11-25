@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getLandlordViewings, updateViewingStatus, getAllListingsFromStorage } from "@/lib/api/landlord";
+import { getViewingRequests } from "@/lib/api/viewings";
+import { fetchAllHousesFromApi } from "@/lib/api/listings";
 import { mockListings } from "@/mocks/listings";
 import { mockUsers } from "@/mocks/users";
 import { getAllUsers } from "@/lib/auth/mock-auth";
@@ -24,11 +26,19 @@ export default function LandlordViewingsPage() {
   const [notice, setNotice] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    let active = true;
+    void fetchAllHousesFromApi();
+    void getViewingRequests().then((data) => {
+      if (active && data.length > 0) setViewings(data);
+    });
     const handleSync = () => {
       setViewings(getLandlordViewings());
     };
     window.addEventListener("house_rental_viewings_change", handleSync);
-    return () => window.removeEventListener("house_rental_viewings_change", handleSync);
+    return () => {
+      active = false;
+      window.removeEventListener("house_rental_viewings_change", handleSync);
+    };
   }, []);
 
   const showNotification = (msg: string) => {

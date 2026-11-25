@@ -110,8 +110,12 @@ namespace APIDemo.Services
         {
             Id = user.Id,
             Username = user.Username,
+            FullName = user.FullName,
             Email = user.Email,
+            Phone = user.Phone,
             Role = user.Role,
+            Department = user.Department,
+            DateOfBirth = user.DateOfBirth,
             CreatedAt = user.CreatedAt
         };
 

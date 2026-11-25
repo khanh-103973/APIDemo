@@ -17,9 +17,9 @@ namespace APIDemo.Controllers
             _contractService = contractService;
         }
 
-        // 1. GET /api/contracts (Xem danh sách hợp đồng, lọc theo Status - Admin, Owner)
+        // 1. GET /api/contracts (Xem danh sách hợp đồng, lọc theo Status - Admin, Owner, Manager)
         [HttpGet]
-        [Authorize(Roles = "Admin,Owner")]
+        [Authorize(Roles = "Admin,Owner,Manager")]
         public async Task<IActionResult> GetAll([FromQuery] string? status)
         {
             var contracts = await _contractService.GetAllContractsAsync(status);
@@ -48,9 +48,9 @@ namespace APIDemo.Controllers
             return Ok(contract);
         }
 
-        // 4. POST /api/contracts (Tạo hợp đồng - Chỉ Admin hoặc Owner và người ký phải từ 18 tuổi trở lên)
+        // 4. POST /api/contracts (Tạo hợp đồng - Chỉ Admin, Owner hoặc Manager và người ký phải từ 18 tuổi trở lên)
         [HttpPost]
-        [Authorize(Roles = "Admin,Owner", Policy = "AtLeast18")]
+        [Authorize(Roles = "Admin,Owner,Manager", Policy = "AtLeast18")]
         public async Task<IActionResult> Create([FromBody] ContractDto dto)
         {
             var result = await _contractService.CreateContractAsync(dto);
@@ -65,9 +65,9 @@ namespace APIDemo.Controllers
                 result.Data);
         }
 
-        // 5. PUT /api/contracts/{id} (Cập nhật hợp đồng - Chỉ Admin hoặc Owner)
+        // 5. PUT /api/contracts/{id} (Cập nhật hợp đồng - Chỉ Admin, Owner hoặc Manager)
         [HttpPut("{id:int}")]
-        [Authorize(Roles = "Admin,Owner")]
+        [Authorize(Roles = "Admin,Owner,Manager")]
         public async Task<IActionResult> Update(int id, [FromBody] ContractDto dto)
         {
             var result = await _contractService.UpdateContractAsync(id, dto);

@@ -101,7 +101,9 @@ export default async function ListingDetailsPage({
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 text-primary shrink-0" />
                 <span>
-                  {listing.address}, {listing.district}, {listing.city}
+                  {[listing.address, listing.district, listing.city]
+                    .filter(Boolean)
+                    .join(", ")}
                 </span>
               </div>
 

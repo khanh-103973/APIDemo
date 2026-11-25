@@ -4,7 +4,7 @@ import { apiRequest, resolveBackendImageUrl } from "@/lib/api/client";
 
 export const STORAGE_KEY_LISTINGS = "house_rental_listings";
 
-interface BackendHouse {
+export interface BackendHouse {
   id: number;
   title: string;
   description: string;
@@ -17,17 +17,35 @@ interface BackendHouse {
   ownerId: number;
 }
 
-interface BackendPageResult<T> {
+export interface BackendPageResult<T> {
   items: T[];
   totalCount: number;
   pageNumber: number;
   pageSize: number;
 }
 
-function mapHouseToListing(house: BackendHouse): Listing {
-  const parts = (house.address || "").split(",").map((s) => s.trim());
-  const city = parts.length >= 1 ? parts[parts.length - 1] : "TP. Hồ Chí Minh";
-  const district = parts.length >= 2 ? parts[parts.length - 2] : "Quận 1";
+export function mapHouseToListing(house: BackendHouse): Listing {
+  const parts = (house.address || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let street = house.address || "";
+  let district = "Quận 1";
+  let city = "TP. Hồ Chí Minh";
+
+  if (parts.length >= 3) {
+    city = parts[parts.length - 1];
+    district = parts[parts.length - 2];
+    street = parts.slice(0, parts.length - 2).join(", ");
+  } else if (parts.length === 2) {
+    city = parts[1];
+    district = parts[0];
+    street = "";
+  } else if (parts.length === 1) {
+    street = parts[0];
+  }
+
   const normalizedStatus = (house.status || "").toLowerCase();
 
   return {
@@ -43,13 +61,18 @@ function mapHouseToListing(house: BackendHouse): Listing {
     area: Number(house.area) || 25,
     bedrooms: Number(house.bedrooms) || 1,
     bathrooms: Math.max(1, Math.min(house.bedrooms || 1, 2)),
-    address: house.address || "",
+    address: street,
     ward: "",
     district,
     city,
     amenities: ["Wi-Fi tốc độ cao", "Điều hòa", "An ninh 24/7"],
     images: [resolveBackendImageUrl(house.imageUrl)],
-    status: normalizedStatus === "rented" ? "rented" : "active",
+    status:
+      normalizedStatus === "rented"
+        ? "rented"
+        : normalizedStatus === "maintenance"
+        ? "hidden"
+        : "active",
     moderationStatus: "approved",
     isFeatured: true,
     viewsCount: 120,
@@ -71,6 +94,27 @@ export function getRawListings(): Listing[] {
     localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(mockListings));
   } catch {}
   return mockListings;
+}
+
+export async function fetchAllHousesFromApi(): Promise<Listing[] | null> {
+  try {
+    const res = await apiRequest<BackendPageResult<BackendHouse>>(
+      "/houses?pageNumber=1&pageSize=100",
+      { skipAuth: true }
+    );
+    if (res && Array.isArray(res.items)) {
+      const mapped = res.items.map(mapHouseToListing);
+      if (typeof window !== "undefined" && mapped.length > 0) {
+        try {
+          localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(mapped));
+        } catch {}
+      }
+      return mapped;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export async function getListings(
@@ -102,6 +146,11 @@ export async function getListings(
     );
     if (res && Array.isArray(res.items) && res.items.length > 0) {
       let apiListings = res.items.map(mapHouseToListing);
+      if (typeof window !== "undefined" && !filters?.query) {
+        try {
+          localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(apiListings));
+        } catch {}
+      }
       if (filters?.city) {
         apiListings = apiListings.filter((l) =>
           l.city.toLowerCase().includes(filters.city!.toLowerCase())
