@@ -26,15 +26,60 @@ namespace APIDemo.Repositories
             return await query.ToListAsync();
         }
 
+        public async Task<IEnumerable<Contract>> GetAllForUserAsync(string? status, int userId, bool includeOwnedHouses)
+        {
+            var query = _context.Contracts
+                .AsNoTracking()
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.House)
+                .AsQueryable();
+
+            if (includeOwnedHouses)
+            {
+                query = query.Where(c =>
+                    c.Booking != null &&
+                    (c.Booking.UserId == userId || (c.Booking.House != null && c.Booking.House.OwnerId == userId)));
+            }
+            else
+            {
+                query = query.Where(c => c.Booking != null && c.Booking.UserId == userId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var normalizedStatus = status.Trim();
+                query = query.Where(c => c.Status == normalizedStatus);
+            }
+
+            return await query.ToListAsync();
+        }
+
         public async Task<Contract?> GetByIdAsync(int id)
         {
             return await _context.Contracts.FindAsync(id);
+        }
+
+        public async Task<Contract?> GetByIdWithDetailsAsync(int id)
+        {
+            return await _context.Contracts
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.House)
+                .FirstOrDefaultAsync(c => c.Id == id);
         }
 
         public async Task<Contract?> GetByBookingIdAsync(int bookingId)
         {
             return await _context.Contracts
                 .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.BookingId == bookingId);
+        }
+
+        public async Task<Contract?> GetByBookingIdWithDetailsAsync(int bookingId)
+        {
+            return await _context.Contracts
+                .AsNoTracking()
+                .Include(c => c.Booking)
+                    .ThenInclude(b => b!.House)
                 .FirstOrDefaultAsync(c => c.BookingId == bookingId);
         }
 

@@ -21,12 +21,13 @@ import { getAllUsers } from "@/lib/auth/mock-auth";
 import { ViewingRequest, ViewingStatus } from "@/types";
 
 export default function LandlordViewingsPage() {
-  const [viewings, setViewings] = React.useState<ViewingRequest[]>(getLandlordViewings);
+  const [viewings, setViewings] = React.useState<ViewingRequest[]>([]);
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [notice, setNotice] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let active = true;
+    setViewings(getLandlordViewings());
     void fetchAllHousesFromApi();
     void getViewingRequests().then((data) => {
       if (active && data.length > 0) setViewings(data);

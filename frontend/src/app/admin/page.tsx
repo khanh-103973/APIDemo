@@ -21,17 +21,45 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { formatVND } from "@/lib/format/currency";
 import {
   getAdminStats,
+  fetchAdminStatsFromApi,
   getAdminListings,
+  fetchAdminListingsFromApi,
   getAdminActivityLogs,
   moderateAdminListing,
 } from "@/lib/api/admin";
 import { Listing } from "@/types";
 
 export default function AdminOverviewPage() {
-  const [stats, setStats] = React.useState(getAdminStats);
-  const [listings, setListings] = React.useState<Listing[]>(getAdminListings);
-  const [logs] = React.useState(getAdminActivityLogs);
+  const [stats, setStats] = React.useState({
+    totalUsers: 0,
+    tenantsCount: 0,
+    landlordsCount: 0,
+    totalListings: 0,
+    activeListings: 0,
+    pendingModeration: 0,
+    pendingVerifications: 0,
+    pendingReports: 0,
+    moderationSpeedHours: "1.8",
+  });
+  const [listings, setListings] = React.useState<Listing[]>([]);
+  const [logs, setLogs] = React.useState<ReturnType<typeof getAdminActivityLogs>>([]);
   const [notice, setNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    setStats(getAdminStats());
+    setListings(getAdminListings());
+    setLogs(getAdminActivityLogs());
+    void fetchAdminStatsFromApi().then((data) => {
+      if (active) setStats(data);
+    });
+    void fetchAdminListingsFromApi().then((data) => {
+      if (active && data.length > 0) setListings(data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const pendingListings = listings.filter(
     (l) => l.moderationStatus === "pending" || l.status === "pending"

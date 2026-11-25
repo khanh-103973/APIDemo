@@ -20,7 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format/currency";
-import { getContracts } from "@/lib/api/contracts";
+import { getContracts, createContractOnApi } from "@/lib/api/contracts";
 import { mockContracts } from "@/mocks/contracts";
 import { mockProperties, mockRooms } from "@/mocks/properties";
 import { mockUsers } from "@/mocks/users";
@@ -70,9 +70,23 @@ export default function LandlordContractsPage() {
     return true;
   });
 
-  const handleCreateContract = (e: React.FormEvent) => {
+  const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
-    const created: Contract = {
+    const startIso = new Date().toISOString();
+    const endDateObj = new Date();
+    endDateObj.setFullYear(endDateObj.getFullYear() + 1);
+    const endIso = endDateObj.toISOString();
+
+    const apiCreated = await createContractOnApi({
+      bookingId: 1,
+      monthlyRent: Number(newCt.monthlyRent),
+      deposit: Number(newCt.deposit),
+      startDateIso: startIso,
+      endDateIso: endIso,
+      status: "Active",
+    });
+
+    const created: Contract = apiCreated || {
       id: `ct_${Date.now()}`,
       contractNumber: newCt.contractNumber,
       propertyId: "prop_1",
@@ -92,7 +106,11 @@ export default function LandlordContractsPage() {
 
     setContracts([created, ...contracts]);
     setShowNewModal(false);
-    showNotification("Đã tạo hợp đồng cho thuê mới thành công!");
+    showNotification(
+      apiCreated
+        ? "Đã tạo và lưu hợp đồng vào Backend thành công!"
+        : "Đã tạo hợp đồng cho thuê mới thành công!"
+    );
   };
 
   return (

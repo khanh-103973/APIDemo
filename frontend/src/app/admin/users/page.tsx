@@ -22,7 +22,7 @@ import { getAdminUsers, fetchAdminUsersFromApi, toggleAdminUserStatus } from "@/
 import { User } from "@/types";
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = React.useState<User[]>(getAdminUsers);
+  const [users, setUsers] = React.useState<User[]>([]);
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
@@ -31,6 +31,7 @@ export default function AdminUsersPage() {
 
   React.useEffect(() => {
     let active = true;
+    setUsers(getAdminUsers());
     void fetchAdminUsersFromApi().then((data) => {
       if (active && data.length > 0) setUsers(data);
     });

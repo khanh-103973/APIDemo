@@ -32,13 +32,14 @@ import {
 
 export default function TenantViewingsPage() {
   const router = useRouter();
-  const [viewings, setViewings] = React.useState<ViewingRequest[]>(getMockTenantViewings);
+  const [viewings, setViewings] = React.useState<ViewingRequest[]>([]);
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [cancelTargetId, setCancelTargetId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let active = true;
     const current = getMockCurrentUser();
+    setViewings(getMockTenantViewings());
     void fetchAllHousesFromApi();
     void getViewingRequests({ tenantId: current?.id }).then((data) => {
       if (active && data.length > 0) setViewings(data);

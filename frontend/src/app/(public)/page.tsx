@@ -48,7 +48,7 @@ export default async function HomePage() {
             </h1>
 
             <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-              Hơn 10.000+ phòng trọ, căn hộ studio và chung cư xác thực tại TP.HCM & Hà Nội. Minh bạch biểu phí điện nước, xem phòng miễn phí, ký hợp đồng an toàn.
+              Tìm phòng trọ, căn hộ studio và nhà nguyên căn xác thực tại TP. Đà Nẵng (Hải Châu, Sơn Trà, Thanh Khê, Ngũ Hành Sơn) và toàn quốc. Minh bạch chi phí, xem phòng miễn phí, ký hợp đồng an toàn.
             </p>
           </div>
 
@@ -143,7 +143,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <PopularAreas />
+          <PopularAreas listings={featuredListings} />
         </div>
       </section>
 

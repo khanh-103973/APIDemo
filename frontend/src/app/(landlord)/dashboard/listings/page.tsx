@@ -37,7 +37,7 @@ import {
 import { Listing, ListingStatus } from "@/types";
 
 export default function LandlordListingsPage() {
-  const [listings, setListings] = React.useState<Listing[]>(getLandlordListings);
+  const [listings, setListings] = React.useState<Listing[]>([]);
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [propertyFilter, setPropertyFilter] = React.useState<string>("all");
@@ -47,6 +47,7 @@ export default function LandlordListingsPage() {
 
   React.useEffect(() => {
     let active = true;
+    setListings(getLandlordListings());
     void fetchLandlordListingsFromApi().then((data) => {
       if (active && data.length > 0) setListings(data);
     });

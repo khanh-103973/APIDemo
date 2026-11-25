@@ -23,7 +23,7 @@ import {
 import { Listing } from "@/types";
 
 export default function AdminListingsPage() {
-  const [listings, setListings] = React.useState<Listing[]>(getAdminListings);
+  const [listings, setListings] = React.useState<Listing[]>([]);
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [cityFilter, setCityFilter] = React.useState<string>("all");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
@@ -31,6 +31,7 @@ export default function AdminListingsPage() {
 
   React.useEffect(() => {
     let active = true;
+    setListings(getAdminListings());
     void fetchAdminListingsFromApi().then((data) => {
       if (active && data.length > 0) setListings(data);
     });

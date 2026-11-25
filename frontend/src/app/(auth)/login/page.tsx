@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, Building } from "lucide-react";
+import { Lock, Mail, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -38,10 +38,7 @@ function LoginForm() {
     setIsLoading(false);
 
     if (!result.success || !result.user) {
-      setError(
-        result.error ||
-          "Tài khoản hoặc mật khẩu không chính xác. Bạn có thể sử dụng các tài khoản mẫu bên dưới."
-      );
+      setError(result.error || "Tên đăng nhập hoặc mật khẩu không chính xác.");
       return;
     }
 
@@ -54,12 +51,6 @@ function LoginForm() {
     } else {
       router.push("/account/rentals");
     }
-  };
-
-  const handleSelectQuickAccount = (identifier: string, pwd: string) => {
-    setEmail(identifier);
-    setPassword(pwd);
-    setError(null);
   };
 
   return (
@@ -87,7 +78,7 @@ function LoginForm() {
           <div className="relative">
             <Input
               type="text"
-              placeholder="admin hoặc admin@rental.com"
+              placeholder="Nhập tên đăng nhập hoặc email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="pl-9"
@@ -148,51 +139,7 @@ function LoginForm() {
         </Button>
       </form>
 
-      {/* Quick Login Helpers (Synced with Real SQL Server APIDemo Database) */}
-      <div className="pt-4 border-t border-border space-y-2">
-        <span className="text-xs font-semibold text-muted-foreground block text-center">
-          Tài khoản thật trong SQL Server (mật khẩu: 123456):
-        </span>
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={() => handleSelectQuickAccount("adult_user", "123456")}
-            className="flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium bg-surface hover:bg-slate-200/70 border border-border text-foreground transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Khách thuê: <strong>adult_user</strong> (adult@rental.com)</span>
-            </div>
-            <span className="text-[10px] text-muted-foreground">Điền sẵn</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSelectQuickAccount("manager", "123456")}
-            className="flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium bg-surface hover:bg-slate-200/70 border border-border text-foreground transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Building className="h-3.5 w-3.5 text-purple-600" />
-              <span>Chủ nhà / Quản lý: <strong>manager</strong> (manager@rental.com)</span>
-            </div>
-            <span className="text-[10px] text-muted-foreground">Điền sẵn</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSelectQuickAccount("admin", "123456")}
-            className="flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium bg-surface hover:bg-slate-200/70 border border-border text-foreground transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
-              <span>Admin: <strong>admin</strong> (admin@rental.com)</span>
-            </div>
-            <span className="text-[10px] text-muted-foreground">Điền sẵn</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="text-center text-xs text-muted-foreground pt-2">
+      <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border">
         Chưa có tài khoản?{" "}
         <Link href="/register" className="font-semibold text-primary hover:underline">
           Đăng ký ngay

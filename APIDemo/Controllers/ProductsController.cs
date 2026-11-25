@@ -1,4 +1,5 @@
 ﻿using APIDemo.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace APIDemo.Controllers
@@ -29,6 +30,7 @@ namespace APIDemo.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin,Owner,Manager")]
         public IActionResult Create(ProductDto product)
         {
             return Ok(product);

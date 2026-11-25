@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-using System.Text;
 using APIDemo.Models;
+using APIDemo.Security;
 
 namespace APIDemo.Data
 {
@@ -8,10 +7,10 @@ namespace APIDemo.Data
     {
         public static void Seed(AppDbContext context)
         {
-            // 1. Tự động Seed Users chuẩn mật khẩu HMACSHA512: "123456"
+            // 1. Tự động Seed Users chuẩn băm PBKDF2-HMAC-SHA512 (mật khẩu mặc định: "123456")
             if (!context.Users.Any())
             {
-                CreatePasswordHash("123456", out byte[] hash, out byte[] salt);
+                PasswordHasher.CreatePasswordHash("123456", out byte[] hash, out byte[] salt);
 
                 var users = new List<User>
                 {
@@ -109,9 +108,9 @@ namespace APIDemo.Data
                 {
                     new House
                     {
-                        Title = "Căn hộ mini ban công thoáng mát",
-                        Description = "Đầy đủ nội thất gồm máy lạnh, tủ lạnh, giường nệm. Giờ giấc tự do.",
-                        Address = "Quận 1, TP. Hồ Chí Minh",
+                        Title = "Căn hộ mini gần Đại học Đông Á - Hải Châu",
+                        Description = "Phòng đầy đủ nội thất mới 100%, có bếp riêng, ban công thoáng mát, giờ giấc tự do, đi bộ 3 phút đến Đại học Đông Á.",
+                        Address = "33 Xô Viết Nghệ Tĩnh, Quận Hải Châu, TP. Đà Nẵng",
                         Price = 4500000,
                         Area = 28,
                         Bedrooms = 1,
@@ -121,10 +120,10 @@ namespace APIDemo.Data
                     },
                     new House
                     {
-                        Title = "Nhà nguyên căn 2 phòng ngủ tiện nghi",
-                        Description = "Khu dân cư an ninh, yên tĩnh, gần chợ và trường học. Phù hợp gia đình trẻ.",
-                        Address = "Quận Bình Thạnh, TP. Hồ Chí Minh",
-                        Price = 9500000,
+                        Title = "Nhà nguyên căn 2 phòng ngủ gần Biển Mỹ Khê",
+                        Description = "Khu dân cư yên tĩnh gần biển Mỹ Khê và Cầu Rồng, phù hợp gia đình nhỏ hoặc nhóm sinh viên, có chỗ để xe rộng rãi.",
+                        Address = "120 Võ Nguyên Giáp, Quận Sơn Trà, TP. Đà Nẵng",
+                        Price = 9000000,
                         Area = 65,
                         Bedrooms = 2,
                         ImageUrl = "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688",
@@ -133,9 +132,9 @@ namespace APIDemo.Data
                     },
                     new House
                     {
-                        Title = "Phòng trọ sinh viên có gác lửng",
-                        Description = "Gần các trường đại học, có camera an ninh, wifi tốc độ cao.",
-                        Address = "Quận Gò Vấp, TP. Hồ Chí Minh",
+                        Title = "Phòng trọ có gác lửng trung tâm Thanh Khê",
+                        Description = "Phòng sạch sẽ, có gác lửng cao, điều hòa inverter, chỗ để xe miễn phí, gần đường Điện Biên Phủ và siêu thị Coopmart.",
+                        Address = "215 Điện Biên Phủ, Quận Thanh Khê, TP. Đà Nẵng",
                         Price = 3200000,
                         Area = 22,
                         Bedrooms = 1,
@@ -145,13 +144,13 @@ namespace APIDemo.Data
                     },
                     new House
                     {
-                        Title = "Căn hộ cao cấp 3 phòng ngủ view sông",
-                        Description = "Nội thất cao cấp nhập khẩu, hồ bơi, phòng gym miễn phí.",
-                        Address = "Quận 2, TP. Hồ Chí Minh",
-                        Price = 18000000,
-                        Area = 95,
-                        Bedrooms = 3,
-                        ImageUrl = "https://images.unsplash.com/photo-1493809842364-78817add7ffb",
+                        Title = "Studio cao cấp gần ĐH Kinh Tế - Ngũ Hành Sơn",
+                        Description = "Studio thiết kế hiện đại, cửa sổ lớn đón gió biển, khóa vân tay an ninh 24/7, cách Đại học Kinh tế Đà Nẵng 500m.",
+                        Address = "68 Ngũ Hành Sơn, Quận Ngũ Hành Sơn, TP. Đà Nẵng",
+                        Price = 5200000,
+                        Area = 34,
+                        Bedrooms = 1,
+                        ImageUrl = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750",
                         Status = "Available",
                         OwnerId = ownerHoa.Id
                     }
@@ -219,13 +218,6 @@ namespace APIDemo.Data
                     context.SaveChanges();
                 }
             }
-        }
-
-        private static void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
-        {
-            using var hmac = new HMACSHA512();
-            passwordSalt = hmac.Key;
-            passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
         }
     }
 }

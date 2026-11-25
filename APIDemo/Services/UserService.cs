@@ -1,9 +1,9 @@
-using System.Security.Cryptography;
-using System.Text;
 using APIDemo.DTOs;
 using APIDemo.DTOs.Common;
+using APIDemo.Exceptions;
 using APIDemo.Models;
 using APIDemo.Repositories;
+using APIDemo.Security;
 
 namespace APIDemo.Services
 {
@@ -19,11 +19,8 @@ namespace APIDemo.Services
         public async Task<PageResult<UserResponseDto>> GetAllAsync(UserQueryParameters queryParams)
         {
             var pagedUsers = await _userRepo.GetAllAsync(queryParams);
-
-            // Map danh sách Entity sang DTO
             var mappedItems = pagedUsers.Items.Select(MapToResponseDto).ToList();
 
-            // Trả về PagedResult chứa DTO kèm đầy đủ Metadata
             return new PageResult<UserResponseDto>(
                 mappedItems,
                 pagedUsers.TotalCount,
@@ -40,23 +37,30 @@ namespace APIDemo.Services
 
         public async Task<(bool IsSuccess, string Message, UserResponseDto? Data)> RegisterAsync(UserRegisterDto request)
         {
-            var existingUser = await _userRepo.GetByUsernameOrEmailAsync(request.Username, request.Email);
+            // Chặn tự đăng ký vai trò Admin / Manager / Staff
+            var safeRole = AuthService.ValidatePublicRegistrationRole(request.Role);
+
+            var existingUser = await _userRepo.GetByUsernameOrEmailAsync(
+                request.Username.Trim(),
+                request.Email.Trim().ToLowerInvariant());
             if (existingUser != null)
             {
                 return (false, "Username hoặc Email đã được sử dụng.", null);
             }
 
-            CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
+            PasswordHasher.CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
 
             var newUser = new User
             {
-                Username = request.Username,
-                Email = request.Email,
+                Username = request.Username.Trim(),
+                Email = request.Email.Trim().ToLowerInvariant(),
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
-                Role = string.IsNullOrEmpty(request.Role) ? "User" : request.Role,
-                FullName = request.FullName,
-                Phone = request.Phone,
+                Role = safeRole,
+                Department = "General",
+                FullName = request.FullName.Trim(),
+                Phone = request.Phone.Trim(),
+                DateOfBirth = request.DateOfBirth,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -66,7 +70,7 @@ namespace APIDemo.Services
             return (true, "Đăng ký thành công", MapToResponseDto(newUser));
         }
 
-        public async Task<(bool IsSuccess, string Message)> UpdateAsync(int id, UserRegisterDto request)
+        public async Task<(bool IsSuccess, string Message)> UpdateAsync(int id, UserRegisterDto request, bool allowRoleUpdate = false)
         {
             var user = await _userRepo.GetByIdAsync(id);
             if (user == null)
@@ -74,13 +78,36 @@ namespace APIDemo.Services
                 return (false, $"Không tìm thấy người dùng có Id = {id}");
             }
 
-            if (!string.IsNullOrEmpty(request.Email)) user.Email = request.Email;
-            if (!string.IsNullOrEmpty(request.Role)) user.Role = request.Role;
-            if (!string.IsNullOrEmpty(request.Username)) user.Username = request.Username;
-
-            if (!string.IsNullOrEmpty(request.Password))
+            // Chặn leo thang quyền (Role / Department) khi người gọi không phải Admin
+            if (!allowRoleUpdate)
             {
-                CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
+                if (!string.IsNullOrWhiteSpace(request.Role) &&
+                    !request.Role.Trim().Equals(user.Role, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ForbiddenException("Chỉ Quản trị viên (Admin) mới có quyền thay đổi vai trò (Role) của tài khoản.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.Department) &&
+                    !request.Department.Trim().Equals(user.Department, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ForbiddenException("Chỉ Quản trị viên (Admin) mới có quyền thay đổi phòng ban (Department).");
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(request.Role)) user.Role = request.Role.Trim();
+                if (!string.IsNullOrWhiteSpace(request.Department)) user.Department = request.Department.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Email)) user.Email = request.Email.Trim().ToLowerInvariant();
+            if (!string.IsNullOrWhiteSpace(request.Username)) user.Username = request.Username.Trim();
+            if (!string.IsNullOrWhiteSpace(request.FullName)) user.FullName = request.FullName.Trim();
+            if (!string.IsNullOrWhiteSpace(request.Phone)) user.Phone = request.Phone.Trim();
+            if (request.DateOfBirth.HasValue) user.DateOfBirth = request.DateOfBirth;
+
+            if (!string.IsNullOrWhiteSpace(request.Password))
+            {
+                PasswordHasher.CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
                 user.PasswordHash = passwordHash;
                 user.PasswordSalt = passwordSalt;
             }
@@ -105,7 +132,6 @@ namespace APIDemo.Services
             return (true, $"Đã xóa người dùng Id = {id}");
         }
 
-        // Helper Private Methods
         private static UserResponseDto MapToResponseDto(User user) => new()
         {
             Id = user.Id,
@@ -118,14 +144,5 @@ namespace APIDemo.Services
             DateOfBirth = user.DateOfBirth,
             CreatedAt = user.CreatedAt
         };
-
-        private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
-        {
-            using (var hmac = new HMACSHA512())
-            {
-                passwordSalt = hmac.Key;
-                passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
-            }
-        }
     }
 }

@@ -15,5 +15,8 @@ namespace APIDemo.DTOs
 
         [Required(ErrorMessage = "Ngày kết thúc không được để trống.")]
         public DateTime EndDate { get; set; }
+
+        [MaxLength(20, ErrorMessage = "Trạng thái tối đa 20 ký tự.")]
+        public string? Status { get; set; }
     }
 }

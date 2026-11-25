@@ -387,5 +387,39 @@ export function updateViewingStatus(
       window.dispatchEvent(new Event("house_rental_viewings_change"));
     } catch {}
   }
+
+  // Sync booking status update to ASP.NET Core PUT /api/bookings/{id}
+  const target = all.find((v) => v.id === id);
+  const numericBookingId = Number(id.replace("bk_", ""));
+  if (
+    target &&
+    getAuthToken() &&
+    Number.isInteger(numericBookingId) &&
+    numericBookingId > 0
+  ) {
+    const backendStatus =
+      status === "confirmed"
+        ? "Approved"
+        : status === "completed"
+        ? "Completed"
+        : status === "cancelled" || status === "rejected"
+        ? "Cancelled"
+        : "Pending";
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() + 1);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 6);
+    void apiRequest(`/bookings/${numericBookingId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        userId: Number(target.tenantId) || 4,
+        houseId: Number(target.listingId.replace("house_", "")) || 1,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        status: backendStatus,
+      }),
+    }).catch(() => {});
+  }
+
   return getLandlordViewings();
 }

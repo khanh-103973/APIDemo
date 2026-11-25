@@ -26,9 +26,41 @@ namespace APIDemo.Repositories
             return await query.ToListAsync();
         }
 
+        public async Task<IEnumerable<Booking>> GetAllForUserAsync(string? status, int userId, bool includeOwnedHouses)
+        {
+            var query = _context.Bookings
+                .AsNoTracking()
+                .Include(b => b.House)
+                .AsQueryable();
+
+            if (includeOwnedHouses)
+            {
+                query = query.Where(b => b.UserId == userId || (b.House != null && b.House.OwnerId == userId));
+            }
+            else
+            {
+                query = query.Where(b => b.UserId == userId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var normalizedStatus = status.Trim();
+                query = query.Where(b => b.Status == normalizedStatus);
+            }
+
+            return await query.ToListAsync();
+        }
+
         public async Task<Booking?> GetByIdAsync(int id)
         {
             return await _context.Bookings.FindAsync(id);
+        }
+
+        public async Task<Booking?> GetByIdWithHouseAsync(int id)
+        {
+            return await _context.Bookings
+                .Include(b => b.House)
+                .FirstOrDefaultAsync(b => b.Id == id);
         }
 
         public async Task AddAsync(Booking booking)

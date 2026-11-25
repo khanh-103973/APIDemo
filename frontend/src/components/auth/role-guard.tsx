@@ -2,23 +2,19 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ShieldAlert,
   Lock,
-  Mail,
   ArrowRight,
   LogOut,
   Home,
-  CheckCircle2,
   Building,
   KeyRound,
   ShieldCheck,
 } from "lucide-react";
 import { useMockAuth } from "@/lib/auth/mock-auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
 
 interface RoleGuardProps {
   requiredRole: "admin" | "landlord" | "tenant";
@@ -28,54 +24,31 @@ interface RoleGuardProps {
 const roleConfig = {
   admin: {
     name: "Quản trị viên (Admin)",
-    description: "Khu vực quản lý hệ thống, kiểm duyệt tin đăng và hồ sơ định danh.",
+    description: "Khu vực quản lý hệ thống, kiểm duyệt tin đăng và người dùng.",
     icon: ShieldCheck,
-    badgeBg: "bg-amber-100 text-amber-800 border-amber-300",
-    exampleEmail: "admin@houserental.vn",
   },
   landlord: {
-    name: "Chủ nhà / Quản lý trọ (Landlord)",
-    description: "Khu vực quản lý bất động sản, phòng trọ, lập hóa đơn và hợp đồng.",
+    name: "Chủ nhà / Quản lý (Landlord)",
+    description: "Khu vực quản lý bất động sản, phòng trọ, lịch hẹn và hợp đồng.",
     icon: Building,
-    badgeBg: "bg-purple-100 text-purple-700 border-purple-300",
-    exampleEmail: "minhduc.tran@gmail.com",
   },
   tenant: {
     name: "Khách thuê phòng (Tenant)",
-    description: "Khu vực quản lý phòng đang thuê, lịch hẹn xem phòng và hóa đơn thanh toán.",
+    description: "Khu vực quản lý phòng đang thuê, lịch hẹn xem phòng và hợp đồng.",
     icon: KeyRound,
-    badgeBg: "bg-emerald-100 text-emerald-700 border-emerald-300",
-    exampleEmail: "khang.pham@dev.vn",
   },
 };
 
 export function RoleGuard({ requiredRole, children }: RoleGuardProps) {
-  const { user, isLoading, login, logout } = useMockAuth();
+  const { user, isLoading, logout } = useMockAuth();
   const router = useRouter();
-
-  const [inputEmail, setInputEmail] = React.useState("");
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const pathname = usePathname();
 
   const config = roleConfig[requiredRole];
   const RequiredIcon = config.icon;
-
-  const handleQuickLogin = (emailToUse: string) => {
-    setErrorMsg(null);
-    setIsSubmitting(true);
-    setTimeout(() => {
-      const res = login(emailToUse);
-      setIsSubmitting(false);
-      if (!res.success) {
-        setErrorMsg(res.error || "Đăng nhập không thành công.");
-      }
-    }, 300);
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleQuickLogin(inputEmail);
-  };
+  const loginHref = pathname
+    ? `/login?returnTo=${encodeURIComponent(pathname)}`
+    : "/login";
 
   if (isLoading) {
     return (
@@ -86,7 +59,7 @@ export function RoleGuard({ requiredRole, children }: RoleGuardProps) {
     );
   }
 
-  // Case 1: Unauthenticated (No user logged in)
+  // Case 1: Chưa đăng nhập -> yêu cầu đăng nhập bằng tài khoản + mật khẩu thật tại /login
   if (!user) {
     return (
       <div className="min-h-[75vh] flex items-center justify-center p-4">
@@ -100,89 +73,38 @@ export function RoleGuard({ requiredRole, children }: RoleGuardProps) {
               <span>Yêu cầu nhóm: {config.name}</span>
             </div>
             <h2 className="font-heading text-xl font-bold text-foreground">
-              Yêu cầu xác thực tài khoản
+              Yêu cầu đăng nhập
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Giao diện này chỉ hiển thị sau khi nhập email thuộc nhóm{" "}
-              <strong className="text-foreground">{config.name}</strong>.
+              Vui lòng đăng nhập bằng tài khoản thuộc nhóm{" "}
+              <strong className="text-foreground">{config.name}</strong> để tiếp tục truy cập.
             </p>
           </div>
 
-          {errorMsg && (
-            <Alert variant="danger" title="Lỗi xác thực">
-              {errorMsg}
-            </Alert>
-          )}
-
-          <form onSubmit={handleFormSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">
-                Nhập email tài khoản của bạn:
-              </label>
-              <div className="relative">
-                <Input
-                  type="email"
-                  value={inputEmail}
-                  onChange={(e) => setInputEmail(e.target.value)}
-                  placeholder={`Ví dụ: ${config.exampleEmail}`}
-                  className="pl-9 h-11"
-                  required
-                />
-                <Mail className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full h-11 font-bold gap-2"
-              isLoading={isSubmitting}
-            >
-              <span>Xác thực & Vào giao diện</span>
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </form>
-
-          {/* Quick email hints for role verification */}
-          <div className="pt-4 border-t border-slate-100 space-y-2">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Email mẫu được cấp cho nhóm này:
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setInputEmail(config.exampleEmail);
-                handleQuickLogin(config.exampleEmail);
-              }}
-              className="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-primary/50 hover:bg-purple-50/50 transition-colors cursor-pointer text-xs flex items-center justify-between group"
-            >
-              <div>
-                <span className="font-semibold text-foreground group-hover:text-primary">
-                  {config.exampleEmail}
-                </span>
-                <span className="block text-[11px] text-muted-foreground">
-                  (Nhấp để điền & xác thực nhanh)
-                </span>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-            </button>
-          </div>
-
-          <div className="pt-2 text-center">
-            <Link
-              href="/"
-              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-medium"
-            >
-              <Home className="h-3.5 w-3.5" />
-              <span>Quay lại trang chủ sàn</span>
+          <div className="space-y-3">
+            <Link href={loginHref} className="block">
+              <Button variant="primary" className="w-full h-11 font-bold gap-2 cursor-pointer">
+                <span>Đến trang đăng nhập</span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </Link>
+
+            <div className="pt-2 text-center">
+              <Link
+                href="/"
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-medium"
+              >
+                <Home className="h-3.5 w-3.5" />
+                <span>Quay lại trang chủ</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // Case 2: Authenticated but with WRONG role (e.g. Tenant accessing Admin or Landlord)
+  // Case 2: Đã đăng nhập nhưng sai phân quyền (403 Forbidden)
   if (user.role !== requiredRole) {
     const currentConfig = roleConfig[user.role as keyof typeof roleConfig] || {
       name: user.role,
@@ -196,7 +118,7 @@ export function RoleGuard({ requiredRole, children }: RoleGuardProps) {
               <ShieldAlert className="h-7 w-7" />
             </div>
             <h2 className="font-heading text-xl font-bold text-foreground">
-              Quyền truy cập không hợp lệ
+              403 — Không có quyền truy cập
             </h2>
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5 text-left">
               <div className="flex justify-between items-center">
@@ -213,53 +135,44 @@ export function RoleGuard({ requiredRole, children }: RoleGuardProps) {
               </div>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Bạn không thể xem giao diện của nhóm{" "}
-              <strong className="text-foreground">{config.name}</strong> khi đang đăng nhập bằng tài khoản thuộc nhóm khác.
+              Tài khoản của bạn không có quyền truy cập khu vực{" "}
+              <strong className="text-foreground">{config.name}</strong>. Vui lòng quay về trang đúng quyền hoặc đăng xuất để đăng nhập tài khoản khác.
             </p>
           </div>
 
-          <div className="space-y-3 pt-1">
+          <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
             <Button
-              variant="accent"
-              onClick={() => handleQuickLogin(config.exampleEmail)}
-              isLoading={isSubmitting}
-              className="w-full gap-2 font-bold cursor-pointer"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                logout();
+                router.push(loginHref);
+              }}
+              className="w-full sm:w-1/2 gap-2 text-xs cursor-pointer"
             >
-              <RequiredIcon className="h-4 w-4" />
-              <span>Chuyển sang tài khoản {config.name} trên tab này</span>
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Đăng xuất & đổi tài khoản</span>
             </Button>
 
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => logout()}
-                className="w-full sm:w-1/2 gap-2 text-xs"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                <span>Đăng xuất tài khoản này</span>
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (user.role === "admin") router.push("/admin");
-                  else if (user.role === "landlord") router.push("/dashboard");
-                  else router.push("/account/favorites");
-                }}
-                className="w-full sm:w-1/2 gap-2 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <span>Về trang đúng quyền hiện tại</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                if (user.role === "admin") router.push("/admin");
+                else if (user.role === "landlord") router.push("/dashboard");
+                else router.push("/account/rentals");
+              }}
+              className="w-full sm:w-1/2 gap-2 text-xs cursor-pointer"
+            >
+              <span>Về trang đúng quyền</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
       </div>
     );
   }
 
-  // Case 3: Authorized! Render the role's actual interface
+  // Case 3: Hợp lệ phân quyền
   return <>{children}</>;
 }

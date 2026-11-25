@@ -180,24 +180,19 @@ export async function loginWithApi(
       setMockCurrentUser(frontendUser);
       return { success: true, user: frontendUser, viaApi: true };
     }
+    return {
+      success: false,
+      error: "Không nhận được thông tin xác thực từ máy chủ.",
+    };
   } catch (err) {
-    // If backend responded with an explicit HTTP error (401/400/etc.), check mock users only if it's a known offline demo account
     if (err instanceof ApiError) {
-      const fallbackMock = mockUsers.find(
-        (u) => u.email.toLowerCase() === identifier.toLowerCase()
-      );
-      if (fallbackMock && password === "password123") {
-        clearAuthToken();
-        setMockCurrentUser(fallbackMock);
-        return { success: true, user: fallbackMock, viaApi: false };
-      }
       return { success: false, error: err.message };
     }
-    // Network error (Backend not started yet) -> graceful fallback to local mock accounts
+    return {
+      success: false,
+      error: "Không thể kết nối tới máy chủ Backend. Vui lòng kiểm tra API đang chạy.",
+    };
   }
-
-  const fallback = loginWithEmail(identifier);
-  return { ...fallback, viaApi: false };
 }
 
 /**

@@ -16,19 +16,19 @@ export interface SearchFiltersProps {
 
 const cityOptions = [
   { label: "Tất cả thành phố", value: "" },
+  { label: "TP. Đà Nẵng", value: "TP. Đà Nẵng" },
   { label: "TP. Hồ Chí Minh", value: "TP. Hồ Chí Minh" },
   { label: "Hà Nội", value: "Hà Nội" },
-  { label: "Đà Nẵng", value: "Đà Nẵng" },
 ];
 
-const districtOptionsHCMC = [
+const districtOptions = [
   { label: "Tất cả quận/huyện", value: "" },
-  { label: "Quận Bình Thạnh", value: "Quận Bình Thạnh" },
-  { label: "Quận 1", value: "Quận 1" },
-  { label: "Quận 7", value: "Quận 7" },
-  { label: "TP. Thủ Đức", value: "TP. Thủ Đức" },
-  { label: "Quận 3", value: "Quận 3" },
-  { label: "Quận 10", value: "Quận 10" },
+  { label: "Quận Hải Châu", value: "Quận Hải Châu" },
+  { label: "Quận Sơn Trà", value: "Quận Sơn Trà" },
+  { label: "Quận Thanh Khê", value: "Quận Thanh Khê" },
+  { label: "Quận Ngũ Hành Sơn", value: "Quận Ngũ Hành Sơn" },
+  { label: "Quận Liên Chiểu", value: "Quận Liên Chiểu" },
+  { label: "Quận Cẩm Lệ", value: "Quận Cẩm Lệ" },
 ];
 
 const propertyTypeOptions = [
@@ -162,7 +162,7 @@ export function SearchFilters({
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Tìm kiếm theo khu vực, đường, tên tòa nhà (VD: Bình Thạnh, D2)..."
+            placeholder="Tìm kiếm theo khu vực, đường, trường ĐH (VD: Hải Châu, Đông Á, Mỹ Khê)..."
             className="pl-9"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -183,7 +183,7 @@ export function SearchFilters({
         <Select
           value={filters.district || ""}
           onChange={(e) => onFilterChange({ ...filters, district: e.target.value || undefined })}
-          options={districtOptionsHCMC}
+          options={districtOptions}
         />
 
         <Select

@@ -1,6 +1,7 @@
 using APIDemo.DTOs;
 using APIDemo.DTOs.Common;
 using APIDemo.Exceptions;
+using APIDemo.Security;
 using APIDemo.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,6 +33,12 @@ namespace APIDemo.Controllers
         [Authorize]
         public async Task<ActionResult<UserResponseDto>> GetById(int id)
         {
+            var currentUserId = User.GetUserId();
+            if (!User.IsAdmin() && currentUserId != id)
+            {
+                throw new ForbiddenException("Bạn chỉ có quyền xem thông tin tài khoản của chính mình.");
+            }
+
             var user = await _userService.GetByIdAsync(id)
                 ?? throw new NotFoundException($"Không tìm thấy người dùng có Id = {id}");
 
@@ -49,10 +56,17 @@ namespace APIDemo.Controllers
         }
 
         [HttpPut("{id:int}")]
-        [Authorize(Roles = "Admin,Owner,Manager")]
+        [Authorize]
         public async Task<IActionResult> Update(int id, [FromBody] UserRegisterDto request)
         {
-            var result = await _userService.UpdateAsync(id, request);
+            var currentUserId = User.GetUserId();
+            var isAdmin = User.IsAdmin();
+            if (!isAdmin && currentUserId != id)
+            {
+                throw new ForbiddenException("Bạn chỉ có quyền cập nhật thông tin tài khoản của chính mình.");
+            }
+
+            var result = await _userService.UpdateAsync(id, request, allowRoleUpdate: isAdmin);
             if (!result.IsSuccess)
                 throw new BadRequestException(result.Message);
 

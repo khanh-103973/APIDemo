@@ -89,3 +89,31 @@ export async function getContractById(id: string): Promise<Contract | null> {
   }
   return mockContracts.find((c) => c.id === id) || null;
 }
+
+export async function createContractOnApi(payload: {
+  bookingId: number;
+  monthlyRent: number;
+  deposit: number;
+  startDateIso: string;
+  endDateIso: string;
+  status?: string;
+}): Promise<Contract | null> {
+  if (!getAuthToken()) return null;
+  try {
+    const created = await apiRequest<BackendContract>("/contracts", {
+      method: "POST",
+      body: JSON.stringify({
+        bookingId: payload.bookingId,
+        monthlyRent: payload.monthlyRent,
+        deposit: payload.deposit,
+        startDate: payload.startDateIso,
+        endDate: payload.endDateIso,
+        status: payload.status || "Active",
+      }),
+    });
+    if (created) return mapBackendContract(created);
+  } catch {
+    return null;
+  }
+  return null;
+}

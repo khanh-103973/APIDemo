@@ -28,31 +28,67 @@ import { formatVND } from "@/lib/format/currency";
 import {
   getLandlordStats,
   getLandlordListings,
+  fetchLandlordListingsFromApi,
   getLandlordViewings,
   updateViewingStatus,
   LandlordStats,
 } from "@/lib/api/landlord";
+import { getViewingRequests } from "@/lib/api/viewings";
 import { Listing, ViewingRequest } from "@/types";
 import { useMockAuth, getAllUsers } from "@/lib/auth/mock-auth";
 import { mockUsers } from "@/mocks/users";
 
 export default function LandlordDashboardPage() {
   const { user } = useMockAuth();
-  const [stats, setStats] = React.useState<LandlordStats>(getLandlordStats);
-  const [listings, setListings] = React.useState<Listing[]>(getLandlordListings);
-  const [viewings, setViewings] = React.useState<ViewingRequest[]>(getLandlordViewings);
+  const [stats, setStats] = React.useState<LandlordStats>({
+    occupancyRate: 0,
+    totalRooms: 0,
+    occupiedRooms: 0,
+    availableRooms: 0,
+    monthlyRevenue: 0,
+    revenueGrowth: 8.2,
+    pendingViewingsCount: 0,
+    unpaidInvoicesCount: 0,
+    unpaidInvoicesAmount: 0,
+  });
+  const [listings, setListings] = React.useState<Listing[]>([]);
+  const [viewings, setViewings] = React.useState<ViewingRequest[]>([]);
   const [actionMessage, setActionMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    let active = true;
     const handleSync = () => {
       setStats(getLandlordStats());
       setListings(getLandlordListings());
       setViewings(getLandlordViewings());
     };
+    handleSync();
+    void Promise.all([fetchLandlordListingsFromApi(), getViewingRequests()]).then(
+      ([apiListings, apiViewings]) => {
+        if (!active) return;
+        if (apiListings.length > 0) setListings(apiListings);
+        if (apiViewings.length > 0) setViewings(apiViewings);
+        const total = apiListings.length;
+        const rented = apiListings.filter((l) => l.status === "rented").length;
+        const available = Math.max(0, total - rented);
+        const pending = apiViewings.filter((v) => v.status === "pending").length;
+        if (total > 0) {
+          setStats((prev) => ({
+            ...prev,
+            totalRooms: total,
+            occupiedRooms: rented,
+            availableRooms: available,
+            occupancyRate: Math.round((rented / total) * 1000) / 10,
+            pendingViewingsCount: pending,
+          }));
+        }
+      }
+    );
     window.addEventListener("house_rental_viewings_change", handleSync);
     window.addEventListener("house_rental_listings_change", handleSync);
     window.addEventListener("house_rental_invoices_change", handleSync);
     return () => {
+      active = false;
       window.removeEventListener("house_rental_viewings_change", handleSync);
       window.removeEventListener("house_rental_listings_change", handleSync);
       window.removeEventListener("house_rental_invoices_change", handleSync);

@@ -9,5 +9,6 @@ namespace APIDemo.Repositories
         Task<bool> ExistsByUsernameAsync(string username);
         Task<bool> ExistsByEmailAsync(string email);
         Task<User> CreateUserAsync(User user);
+        Task UpdateUserAsync(User user);
     }
 }

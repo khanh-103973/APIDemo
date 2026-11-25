@@ -1,11 +1,11 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using APIDemo.DTOs;
 using APIDemo.Exceptions;
 using APIDemo.Models;
 using APIDemo.Repositories;
+using APIDemo.Security;
 using Microsoft.IdentityModel.Tokens;
 
 namespace APIDemo.Services
@@ -23,17 +23,19 @@ namespace APIDemo.Services
 
         public async Task<AuthResponseDto> RegisterAsync(UserRegisterDto dto)
         {
-            if (await _authRepository.ExistsByUsernameAsync(dto.Username))
+            var normalizedRole = ValidatePublicRegistrationRole(dto.Role);
+
+            if (await _authRepository.ExistsByUsernameAsync(dto.Username.Trim()))
             {
                 throw new ConflictException($"Tên đăng nhập '{dto.Username}' đã tồn tại trong hệ thống.");
             }
 
-            if (await _authRepository.ExistsByEmailAsync(dto.Email))
+            if (await _authRepository.ExistsByEmailAsync(dto.Email.Trim().ToLowerInvariant()))
             {
                 throw new ConflictException($"Email '{dto.Email}' đã được sử dụng.");
             }
 
-            CreatePasswordHash(dto.Password, out var hash, out var salt);
+            PasswordHasher.CreatePasswordHash(dto.Password, out var hash, out var salt);
 
             var user = new User
             {
@@ -43,8 +45,9 @@ namespace APIDemo.Services
                 PasswordHash = hash,
                 PasswordSalt = salt,
                 Phone = string.IsNullOrWhiteSpace(dto.Phone) ? "0912345678" : dto.Phone.Trim(),
-                Role = string.IsNullOrWhiteSpace(dto.Role) ? "Tenant" : dto.Role.Trim(),
-                Department = string.IsNullOrWhiteSpace(dto.Department) ? "General" : dto.Department.Trim(),
+                Role = normalizedRole,
+                // Chặn tự gán Department = "HR" để vượt qua Policy MustBeHR khi tự đăng ký
+                Department = "General",
                 DateOfBirth = dto.DateOfBirth,
                 CreatedAt = DateTime.UtcNow
             };
@@ -78,21 +81,18 @@ namespace APIDemo.Services
                 ?? await _authRepository.GetByEmailAsync(identifier.ToLowerInvariant());
             if (user == null) return null;
 
-            // Băm lại mật khẩu vừa nhập bằng Salt của user trong DB
-            if (user.PasswordSalt != null && user.PasswordHash != null && user.PasswordSalt.Length > 0)
-            {
-                using var hmac = new HMACSHA512(user.PasswordSalt);
-                var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dto.Password));
-
-                // So sánh từng byte an toàn chống Timing Attack
-                if (!CryptographicOperations.FixedTimeEquals(computedHash, user.PasswordHash))
-                {
-                    return null; // Sai mật khẩu
-                }
-            }
-            else
+            if (!PasswordHasher.VerifyPassword(dto.Password, user.PasswordHash, user.PasswordSalt, out var needsRehash))
             {
                 return null;
+            }
+
+            // Tự động nâng cấp tài khoản seed HMACSHA512 cũ lên PBKDF2-HMAC-SHA512 sau khi đăng nhập thành công
+            if (needsRehash)
+            {
+                PasswordHasher.CreatePasswordHash(dto.Password, out var newHash, out var newSalt);
+                user.PasswordHash = newHash;
+                user.PasswordSalt = newSalt;
+                await _authRepository.UpdateUserAsync(user);
             }
 
             var (token, expiresAt) = GenerateJwtToken(user);
@@ -113,6 +113,28 @@ namespace APIDemo.Services
                     DateOfBirth = user.DateOfBirth
                 }
             };
+        }
+
+        public static string ValidatePublicRegistrationRole(string? requestedRole)
+        {
+            if (string.IsNullOrWhiteSpace(requestedRole))
+            {
+                return "Tenant";
+            }
+
+            var trimmed = requestedRole.Trim();
+            if (trimmed.Equals("Tenant", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Tenant";
+            }
+
+            if (trimmed.Equals("Owner", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Owner";
+            }
+
+            throw new ForbiddenException(
+                "Không được phép tự đăng ký với vai trò đặc quyền (Admin/Manager/Staff). Chỉ cho phép đăng ký Tenant hoặc Owner.");
         }
 
         private (string Token, DateTime ExpiresAt) GenerateJwtToken(User user)
@@ -157,13 +179,6 @@ namespace APIDemo.Services
             );
 
             return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
-        }
-
-        private static void CreatePasswordHash(string password, out byte[] hash, out byte[] salt)
-        {
-            using var hmac = new HMACSHA512();
-            salt = hmac.Key;
-            hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
         }
     }
 }

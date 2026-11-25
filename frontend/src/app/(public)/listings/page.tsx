@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import {
   LayoutGrid,
   List as ListIcon,
@@ -31,11 +32,23 @@ const quickTypes = [
   { id: "house", label: "Nhà nguyên căn" },
 ];
 
-export default function ListingsPage() {
+function ListingsPageContent() {
+  const searchParams = useSearchParams();
   const [listings, setListings] = React.useState<Listing[]>([]);
   const [isPending, startTransition] = React.useTransition();
-  const [filters, setFilters] = React.useState<ListingFilterParams>({
-    sortBy: "newest",
+  const [filters, setFilters] = React.useState<ListingFilterParams>(() => {
+    const minP = searchParams.get("minPrice");
+    const maxP = searchParams.get("maxPrice");
+    const pType = searchParams.get("propertyType");
+    return {
+      query: searchParams.get("query") || undefined,
+      city: searchParams.get("city") || undefined,
+      district: searchParams.get("district") || undefined,
+      propertyType: (pType as PropertyType) || undefined,
+      minPrice: minP ? Number(minP) : undefined,
+      maxPrice: maxP ? Number(maxP) : undefined,
+      sortBy: "newest",
+    };
   });
   const [viewMode, setViewMode] = React.useState<"grid" | "list" | "map">("grid");
   const [mobileFilterOpen, setMobileFilterOpen] = React.useState(false);
@@ -287,5 +300,19 @@ export default function ListingsPage() {
         </div>
       </Sheet>
     </div>
+  );
+}
+
+export default function ListingsPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen bg-surface/30 py-12 text-center text-sm text-muted-foreground">
+          Đang tải danh sách phòng cho thuê tại Đà Nẵng...
+        </div>
+      }
+    >
+      <ListingsPageContent />
+    </React.Suspense>
   );
 }

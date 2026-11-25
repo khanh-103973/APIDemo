@@ -1,6 +1,7 @@
 using APIDemo.Exceptions;
 using APIDemo.Models;
 using APIDemo.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -10,6 +11,7 @@ namespace APIDemo.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class FilesController : ControllerBase
     {
         private readonly IFileService _fileService;
@@ -33,6 +35,7 @@ namespace APIDemo.Controllers
         /// Upload ảnh nhà cho thuê vào thư mục wwwroot/images. Kiểm tra định dạng (.jpg, .jpeg, .png) và kích thước (Options Pattern).
         /// </summary>
         [HttpPost("upload-image")]
+        [Authorize(Roles = "Admin,Owner,Manager")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadImage(IFormFile? file)
         {
@@ -88,6 +91,7 @@ namespace APIDemo.Controllers
         /// Upload nhiều file ảnh cùng lúc cho bộ sưu tập phòng/nhà (List&lt;IFormFile&gt;).
         /// </summary>
         [HttpPost("upload-multiple")]
+        [Authorize(Roles = "Admin,Owner,Manager")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadMultiple(List<IFormFile>? files)
         {
@@ -159,6 +163,7 @@ namespace APIDemo.Controllers
         // 3. API đọc thông tin môi trường chạy (Buổi 10)
         // ==========================================
         [HttpGet("environment")]
+        [Authorize(Roles = "Admin")]
         public IActionResult GetEnvironment()
         {
             return Ok(new

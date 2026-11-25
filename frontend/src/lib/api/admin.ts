@@ -6,6 +6,7 @@ import { mockListings } from "@/mocks/listings";
 import { getAllUsers } from "@/lib/auth/mock-auth";
 import { getUsers } from "@/lib/api/users";
 import { fetchAllHousesFromApi } from "@/lib/api/listings";
+import { apiRequest, getAuthToken } from "@/lib/api/client";
 
 const STORAGE_KEY_ADMIN_USERS = "house_rental_admin_users";
 const STORAGE_KEY_ADMIN_LISTINGS = "house_rental_listings";
@@ -202,6 +203,59 @@ export async function fetchAdminListingsFromApi(): Promise<Listing[]> {
     return apiListings;
   }
   return getAdminListings();
+}
+
+/**
+ * Fetch real platform KPI statistics directly from ASP.NET Core /api/users & /api/houses
+ */
+export async function fetchAdminStatsFromApi() {
+  const base = getAdminStats();
+  try {
+    const apiListings = await fetchAllHousesFromApi();
+    const totalListings = apiListings ? apiListings.length : base.totalListings;
+    const activeListings = apiListings
+      ? apiListings.filter((l) => l.status === "active").length
+      : base.activeListings;
+    const pendingModeration = apiListings
+      ? apiListings.filter(
+          (l) => l.moderationStatus === "pending" || l.status === "pending"
+        ).length
+      : base.pendingModeration;
+
+    let totalUsers = base.totalUsers;
+    let tenantsCount = base.tenantsCount;
+    let landlordsCount = base.landlordsCount;
+
+    if (getAuthToken()) {
+      const [allRes, tenantRes, managerRes, ownerRes] = await Promise.all([
+        apiRequest<{ totalCount: number }>("/users?pageNumber=1&pageSize=1").catch(() => null),
+        apiRequest<{ totalCount: number }>("/users?pageNumber=1&pageSize=1&role=Tenant").catch(() => null),
+        apiRequest<{ totalCount: number }>("/users?pageNumber=1&pageSize=1&role=Manager").catch(() => null),
+        apiRequest<{ totalCount: number }>("/users?pageNumber=1&pageSize=1&role=Owner").catch(() => null),
+      ]);
+      if (allRes && typeof allRes.totalCount === "number") {
+        totalUsers = allRes.totalCount;
+      }
+      if (tenantRes && typeof tenantRes.totalCount === "number") {
+        tenantsCount = tenantRes.totalCount;
+      }
+      if (managerRes || ownerRes) {
+        landlordsCount = (managerRes?.totalCount ?? 0) + (ownerRes?.totalCount ?? 0);
+      }
+    }
+
+    return {
+      ...base,
+      totalUsers,
+      tenantsCount,
+      landlordsCount,
+      totalListings,
+      activeListings,
+      pendingModeration,
+    };
+  } catch {
+    return base;
+  }
 }
 
 export function toggleAdminUserStatus(userId: string): User[] {

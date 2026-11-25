@@ -40,8 +40,9 @@ Dự án **House Rental System API** cung cấp một giải pháp Backend RESTf
 | **Entity Framework Core** | `10.0` | ORM quản trị CSDL, ánh xạ quan hệ bảng và Code-First Migrations |
 | **Microsoft SQL Server** | - | Hệ quản trị cơ sở dữ liệu quan hệ |
 | **JWT Bearer Authentication** | `10.0` | Cơ chế xác thực không trạng thái (Stateless Authentication) |
-| **Serilog & Sinks** | `9.0 / 6.0` | Ghi log có cấu trúc ra Console và File xoay vòng theo ngày (`Logs/log-.txt`) |
-| **Swashbuckle Swagger UI** | `6.9` | Sinh tài liệu tương tác API và hỗ trợ test Authorization header |
+| **Serilog & Sinks** | `10.0 / 7.0` | Ghi log có cấu trúc ra Console và File xoay vòng theo ngày (`Logs/log-.txt`) |
+| **Swashbuckle Swagger UI** | `10.3.1` | Sinh tài liệu tương tác API và hỗ trợ test Authorization header |
+| **Next.js / React / Tailwind CSS** | `16.4 / 19.3 / 4.3` | Giao diện Frontend đa vai trò (Public, Tenant, Landlord, Admin) kết nối JWT API |
 
 ### Các mẫu thiết kế (Design Patterns) áp dụng:
 1. **Repository Pattern:** Tách biệt tầng truy cập dữ liệu (EF Core) khỏi tầng xử lý nghiệp vụ, giúp mã nguồn dễ kiểm thử, bảo trì và thay thế.
@@ -202,24 +203,26 @@ erDiagram
 ## PHẦN 5: TỔNG KẾT & CẨM NANG BẢO VỆ ĐỒ ÁN
 
 ### 5.1. Checklist nhanh trước khi lên bảng bảo vệ (Trích Slide 15)
-- [x] **Tránh Demo Effect:** Kiểm tra Connection String trong [appsettings.json](file:///E:/APIDemo/APIDemo/appsettings.json) khớp với SQL Server của máy tính. Chạy script [Database_HouseRental.sql](file:///E:/APIDemo/Database_HouseRental.sql) để có sẵn dữ liệu chuẩn.
-- [x] **Khởi động chuyên nghiệp:** Không mở code Visual Studio lúng túng đầu tiên; chạy ngay Swagger (`https://localhost:7255/swagger`) hoặc Postman để trình bày như sản phẩm thực tế.
-- [x] **Test phân quyền:** Chuẩn bị sẵn 2 luồng: Happy Path (Admin/Owner thực hiện thành công) và Luồng cấm quyền (Tenant gọi API của Admin -> nhận lỗi 403 Forbidden).
-- [x] **Mở Log tự tin:** Nếu gặp lỗi đột xuất, bình tĩnh mở thư mục `Logs/` kiểm tra file nhật ký để phân tích nguyên nhân lỗi trực tiếp.
+- [x] **Tránh Demo Effect:** Kiểm tra Connection String trong `APIDemo/appsettings.json` (`Server=.\SQLEXPRESS;Database=APIDemo;...`) khớp với SQL Server của máy tính.
+- [x] **Khởi động chuyên nghiệp:** Không mở code Visual Studio lúng túng đầu tiên; chạy sẵn Swagger (`http://localhost:5066/swagger` hoặc `https://localhost:7255/swagger`), Postman và Frontend (`http://localhost:3000`) để trình bày như sản phẩm thực tế.
+- [x] **Test phân quyền:** Chuẩn bị sẵn 2 luồng: Happy Path (`admin`/`manager` thực hiện thành công) và Luồng cấm quyền (`adult_user` gọi API của Admin -> `403 Forbidden`, hoặc `young_user` < 18 tuổi đặt lịch -> `403 Forbidden`).
+- [x] **Mở Log tự tin:** Nếu gặp lỗi đột xuất, bình tĩnh mở thư mục `APIDemo/Logs/` kiểm tra file nhật ký theo ngày để phân tích nguyên nhân lỗi trực tiếp.
 
-### 5.2. Danh sách tài khoản mẫu (Seed Data chuẩn để Demo)
+### 5.2. Danh sách tài khoản thật trong SQL Server (Mật khẩu chung: `123456`)
 > **Mẹo:** Ghi nhớ hoặc lưu ra Notepad màn hình desktop các tài khoản này trước khi bảo vệ:
 
-| Tài khoản (Username) | Mật khẩu | Quyền (Role) | Chức vụ / Đại diện |
-| :--- | :--- | :--- | :--- |
-| `admin` | `123456` | **Admin** | Quản trị viên cao nhất hệ thống (xóa nhà, xem toàn bộ users, hợp đồng) |
-| `owner_nam` | `123456` | **Owner** | Chủ nhà Nguyễn Văn Nam (đăng bài, sửa nhà, lập hợp đồng) |
-| `owner_hoa` | `123456` | **Owner** | Chủ nhà Trần Thị Hoa |
-| `tenant_an` | `123456` | **Tenant** | Khách thuê Lê Văn An (xem nhà, đặt lịch thuê) |
-| `tenant_binh` | `123456` | **Tenant** | Khách thuê Phạm Thanh Bình |
+| Tài khoản (Username) | Email | Mật khẩu | Quyền (Role) | Chức vụ / Đại diện |
+| :--- | :--- | :--- | :--- | :--- |
+| `admin` | `admin@rental.com` | `123456` | **Admin** | Quản trị viên cao nhất hệ thống (xóa nhà, xem toàn bộ `505` users, hợp đồng) |
+| `manager` | `manager@rental.com` | `123456` | **Manager** | Chủ nhà / Quản lý chi nhánh (đăng bài, sửa nhà, duyệt lịch, lập hợp đồng) |
+| `adult_user` | `adult@rental.com` | `123456` | **Tenant** | Khách thuê >= 18 tuổi (xem nhà, đặt lịch thuê đạt Policy `AtLeast18`) |
+| `young_user` | `young@rental.com` | `123456` | **Tenant** | Khách thuê < 18 tuổi (test chặn `403 Forbidden` của Policy `AtLeast18`) |
+| `hr_user` | `hr@rental.com` | `123456` | **Staff (HR)** | Test Policy `MustBeHR` trên `/api/employees` |
+
+> *(Nếu chạy mới trên DB trống / InMemoryDatabase, `DbInitializer` sẽ tự seed bộ tài khoản `admin`, `owner_nam`, `owner_hoa`, `tenant_an`, `tenant_binh`, `tenant_tre_em` với mật khẩu `123456`.)*
 
 ### 5.3. Hướng dẫn sử dụng Postman Collection
-1. Mở Postman -> Chọn **Import** -> Chọn file [HouseRental_Postman_Collection.json](file:///E:/APIDemo/HouseRental_Postman_Collection.json) trong thư mục gốc.
+1. Mở Postman -> Chọn **Import** -> Chọn file `HouseRental_Postman_Collection.json` trong thư mục gốc.
 2. Chạy request `1. Authentication -> Login (Lấy JWT Token)` với tài khoản `admin`.
 3. Script test tự động lưu token vào biến `{{token}}`. Tất cả các request sau có yêu cầu khóa bảo vệ (`Users`, `Houses`, `Contracts`) sẽ tự động có header `Authorization: Bearer <token>` mà không cần copy paste thủ công.
 

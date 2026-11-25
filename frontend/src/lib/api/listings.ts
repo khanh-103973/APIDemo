@@ -24,6 +24,22 @@ export interface BackendPageResult<T> {
   pageSize: number;
 }
 
+function normalizeVi(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d");
+}
+
+function inferPropertyType(house: BackendHouse): Listing["propertyType"] {
+  const titleNorm = normalizeVi(house.title || "");
+  if (titleNorm.includes("studio")) return "studio";
+  if (titleNorm.includes("phong tro") || titleNorm.includes("gac lung")) return "boarding_house";
+  if (titleNorm.includes("nguyen can") || house.bedrooms >= 2) return "house";
+  return "apartment";
+}
+
 export function mapHouseToListing(house: BackendHouse): Listing {
   const parts = (house.address || "")
     .split(",")
@@ -31,8 +47,8 @@ export function mapHouseToListing(house: BackendHouse): Listing {
     .filter(Boolean);
 
   let street = house.address || "";
-  let district = "Quận 1";
-  let city = "TP. Hồ Chí Minh";
+  let district = "Quận Hải Châu";
+  let city = "TP. Đà Nẵng";
 
   if (parts.length >= 3) {
     city = parts[parts.length - 1];
@@ -55,7 +71,7 @@ export function mapHouseToListing(house: BackendHouse): Listing {
     title: house.title,
     slug: `house-${house.id}`,
     description: house.description || "",
-    propertyType: house.bedrooms >= 2 ? "house" : "apartment",
+    propertyType: inferPropertyType(house),
     rentPrice: Number(house.price) || 0,
     deposit: Number(house.price) || 0,
     area: Number(house.area) || 25,
@@ -152,13 +168,20 @@ export async function getListings(
         } catch {}
       }
       if (filters?.city) {
+        const cityNorm = normalizeVi(filters.city);
         apiListings = apiListings.filter((l) =>
-          l.city.toLowerCase().includes(filters.city!.toLowerCase())
+          normalizeVi(`${l.city} ${l.address}`).includes(cityNorm)
         );
       }
       if (filters?.district) {
+        const distNorm = normalizeVi(filters.district);
         apiListings = apiListings.filter((l) =>
-          l.district.toLowerCase().includes(filters.district!.toLowerCase())
+          normalizeVi(`${l.district} ${l.address}`).includes(distNorm)
+        );
+      }
+      if (filters?.propertyType) {
+        apiListings = apiListings.filter(
+          (l) => l.propertyType === filters.propertyType
         );
       }
       if (filters?.bedrooms !== undefined) {

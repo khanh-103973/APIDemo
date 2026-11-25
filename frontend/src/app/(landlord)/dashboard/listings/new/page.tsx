@@ -35,7 +35,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format/currency";
-import { saveLandlordListing } from "@/lib/api/landlord";
+import { saveLandlordListing, uploadHouseImageToApi } from "@/lib/api/landlord";
 import { PropertyType } from "@/types";
 
 // Curated sample property photos for 1-click selection
@@ -92,6 +92,8 @@ export default function NewListingWizardPage() {
   const [currentStep, setCurrentStep] = React.useState<number>(1);
   const [showSuccessDialog, setShowSuccessDialog] = React.useState<boolean>(false);
   const [submittedStatus, setSubmittedStatus] = React.useState<"pending" | "draft">("pending");
+  const [isUploadingImage, setIsUploadingImage] = React.useState<boolean>(false);
+  const [uploadFeedback, setUploadFeedback] = React.useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -225,6 +227,25 @@ export default function NewListingWizardPage() {
         images: [...prev.images, prev.customImageUrl.trim()],
         customImageUrl: "",
       }));
+    }
+  };
+
+  const handleUploadRealFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingImage(true);
+    setUploadFeedback(null);
+    const uploadedUrl = await uploadHouseImageToApi(file);
+    setIsUploadingImage(false);
+    e.target.value = "";
+    if (uploadedUrl) {
+      setFormData((prev) => ({
+        ...prev,
+        images: [uploadedUrl, ...prev.images],
+      }));
+      setUploadFeedback(`Đã tải ảnh thật lên Backend (${uploadedUrl})`);
+    } else {
+      setUploadFeedback("Không tải được ảnh lên Backend (chỉ nhận .jpg, .jpeg, .png <= 3MB khi Backend đang chạy).");
     }
   };
 
@@ -557,6 +578,29 @@ export default function NewListingWizardPage() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Real File Upload to ASP.NET Core /api/files/upload-image */}
+            <div className="space-y-2 p-4 rounded-lg border border-dashed border-primary/40 bg-primary/5">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Upload className="h-4 w-4 text-primary" />
+                Tải ảnh trực tiếp từ máy tính lên Backend (<code>/api/files/upload-image</code>):
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png"
+                  onChange={handleUploadRealFile}
+                  disabled={isUploadingImage}
+                  className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer"
+                />
+                {isUploadingImage && (
+                  <span className="text-xs text-primary font-medium">Đang tải ảnh lên server...</span>
+                )}
+              </div>
+              {uploadFeedback && (
+                <p className="text-[11px] text-muted-foreground">{uploadFeedback}</p>
+              )}
             </div>
 
             {/* Custom Image URL Input */}

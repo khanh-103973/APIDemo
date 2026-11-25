@@ -23,17 +23,28 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatVND } from "@/lib/format/currency";
-import { getAdminListings, moderateAdminListing } from "@/lib/api/admin";
+import { getAdminListings, fetchAdminListingsFromApi, moderateAdminListing } from "@/lib/api/admin";
 import { mockUsers } from "@/mocks/users";
 import { Listing } from "@/types";
 
 export default function AdminPendingListingsPage() {
-  const [listings, setListings] = React.useState<Listing[]>(getAdminListings);
+  const [listings, setListings] = React.useState<Listing[]>([]);
   const [rejectingListing, setRejectingListing] = React.useState<Listing | null>(null);
   const [rejectReason, setRejectReason] = React.useState<string>("Hình ảnh không rõ ràng hoặc giá thuê chưa chính xác");
   const [requestingChangesListing, setRequestingChangesListing] = React.useState<Listing | null>(null);
   const [changeNotes, setChangeNotes] = React.useState<string>("Vui lòng bổ sung thêm ảnh khu vực nhà vệ sinh và chốt rõ tiền cọc.");
   const [notice, setNotice] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    setListings(getAdminListings());
+    void fetchAdminListingsFromApi().then((data) => {
+      if (active && data.length > 0) setListings(data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const showNotification = (msg: string) => {
     setNotice(msg);
