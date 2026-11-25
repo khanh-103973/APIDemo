@@ -5,7 +5,7 @@ namespace APIDemo.Repositories
 {
     public interface IUserRepository
     {
-        Task<PagedResult<User>> GetAllAsync(UserQueryParameters queryParams);
+        Task<PageResult<User>> GetAllAsync(UserQueryParameters queryParams);
         Task<User?> GetByIdAsync(int id);
         Task<User?> GetByUsernameOrEmailAsync(string username, string email);
         Task AddAsync(User user);

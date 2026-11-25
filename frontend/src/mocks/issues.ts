@@ -1,0 +1,52 @@
+import { IssueReport } from "@/types";
+
+export const mockIssueReports: IssueReport[] = [
+  {
+    id: "iss_01",
+    tenantId: "usr_tenant_1",
+    landlordId: "usr_landlord_1",
+    propertyId: "prop_1",
+    roomId: "room_101",
+    title: "Máy lạnh rò rỉ nước ở dàn lạnh",
+    description:
+      "Máy lạnh phòng 101 khi bật sau khoảng 30 phút thì bắt đầu chảy nước giọt xuống sàn, mong anh cho thợ kiểm tra giúp.",
+    category: "appliance",
+    urgency: "medium",
+    status: "in_progress",
+    images: [
+      "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80",
+    ],
+    landlordNote: "Đã liên hệ thợ điện lạnh, hẹn 9h sáng mai qua kiểm tra ống thoát nước.",
+    createdAt: "02/03/2026",
+  },
+  {
+    id: "iss_02",
+    tenantId: "usr_tenant_2",
+    landlordId: "usr_landlord_1",
+    propertyId: "prop_2",
+    roomId: "room_301",
+    title: "Vòi sen tắm áp lực nước yếu",
+    description: "Vòi sen nhà tắm áp lực nước bị yếu từ hôm qua, nhờ ban quản lý kiểm tra van nước.",
+    category: "plumbing",
+    urgency: "low",
+    status: "resolved",
+    images: [],
+    landlordNote: "Đã vệ sinh lưới lọc cặn vòi sen, áp lực nước đã bình thường.",
+    createdAt: "20/02/2026",
+    resolvedAt: "21/02/2026",
+  },
+  {
+    id: "iss_03",
+    tenantId: "usr_tenant_1",
+    landlordId: "usr_landlord_1",
+    propertyId: "prop_1",
+    roomId: "room_101",
+    title: "Bóng đèn hành lang tầng 1 bị nhấp nháy",
+    description: "Đèn hành lang trước cửa phòng 101 bị chập chờn gây khó chịu vào ban đêm.",
+    category: "electrical",
+    urgency: "low",
+    status: "pending",
+    images: [],
+    createdAt: "10/03/2026",
+  },
+];

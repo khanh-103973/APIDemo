@@ -1,4 +1,4 @@
-namespace APIDemo.DTOs.Common
+﻿namespace APIDemo.DTOs.Common
 {
     public class ErrorResponse
     {

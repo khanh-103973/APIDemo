@@ -1,5 +1,6 @@
 using APIDemo.Data;
 using APIDemo.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Repositories
 {
@@ -22,6 +23,26 @@ namespace APIDemo.Repositories
         public async Task<StoredFile?> GetByIdAsync(int id)
         {
             return await _context.StoredFiles.FindAsync(id);
+        }
+
+        public async Task<StoredFile?> GetByHashAsync(string hash)
+        {
+            return await _context.StoredFiles.FirstOrDefaultAsync(f => f.FileHash == hash);
+        }
+
+        public async Task<StoredFile?> GetByFileNameAsync(string fileName)
+        {
+            return await _context.StoredFiles.FirstOrDefaultAsync(f => f.FileName == fileName);
+        }
+
+        public void Update(StoredFile file)
+        {
+            _context.StoredFiles.Update(file);
+        }
+
+        public async Task<bool> SaveChangesAsync()
+        {
+            return await _context.SaveChangesAsync() > 0;
         }
     }
 }

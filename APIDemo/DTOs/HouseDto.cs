@@ -4,28 +4,33 @@ namespace APIDemo.DTOs
 {
     public class HouseDto
     {
-        [Required(ErrorMessage = "Tieu de khong duoc de trong.")]
-        [StringLength(150, MinimumLength = 5, ErrorMessage = "Tieu de phai tu 5 den 150 ky tu.")]
+        [Required(ErrorMessage = "Tiêu đề không được để trống.")]
+        [StringLength(150, MinimumLength = 5, ErrorMessage = "Tiêu đề phải từ 5 đến 150 ký tự.")]
         public string Title { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Mo ta khong duoc de trong.")]
-        [StringLength(1000, MinimumLength = 10, ErrorMessage = "Mo ta phai tu 10 den 1000 ky tu.")]
+        [Required(ErrorMessage = "Mô tả không được để trống.")]
+        [StringLength(1000, MinimumLength = 10, ErrorMessage = "Mô tả phải từ 10 đến 1000 ký tự.")]
         public string Description { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Dia chi khong duoc de trong.")]
-        [StringLength(250, MinimumLength = 5, ErrorMessage = "Dia chi phai tu 5 den 250 ky tu.")]
+        [Required(ErrorMessage = "Địa chỉ không được để trống.")]
+        [StringLength(250, MinimumLength = 5, ErrorMessage = "Địa chỉ phải từ 5 đến 250 ký tự.")]
         public string Address { get; set; } = string.Empty;
 
-        [Range(1, 1000000000, ErrorMessage = "Gia thue phai lon hon 0.")]
+        [Range(1, 1000000000, ErrorMessage = "Giá thuê phải lớn hơn 0.")]
         public decimal Price { get; set; }
 
-        [Range(5, 1000, ErrorMessage = "Dien tich phai tu 5 den 1000 m2.")]
+        [Range(5, 1000, ErrorMessage = "Diện tích phải từ 5 đến 1000 m2.")]
         public double Area { get; set; }
 
-        [Range(1, 20, ErrorMessage = "So phong ngu phai tu 1 den 20.")]
+        [Range(1, 20, ErrorMessage = "Số phòng ngủ phải từ 1 đến 20.")]
         public int Bedrooms { get; set; }
 
-        [RegularExpression(@"^$|^https?://.+", ErrorMessage = "ImageUrl phai la duong dan http hoac https.")]
+        [RegularExpression(@"^$|^https?://.+", ErrorMessage = "ImageUrl phải là đường dẫn http hoặc https.")]
         public string ImageUrl { get; set; } = string.Empty;
+
+        public string Status { get; set; } = "Available";
+
+        [Range(1, int.MaxValue, ErrorMessage = "OwnerId không hợp lệ.")]
+        public int OwnerId { get; set; }
     }
 }

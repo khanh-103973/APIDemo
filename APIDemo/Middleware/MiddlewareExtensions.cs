@@ -1,4 +1,4 @@
-namespace APIDemo.Middleware
+﻿namespace APIDemo.Middleware
 {
     public static class MiddlewareExtensions
     {

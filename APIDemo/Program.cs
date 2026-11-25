@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using APIDemo.Authorization;
@@ -21,6 +22,20 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // Đảm bảo thư mục wwwroot và wwwroot/images tồn tại để phục vụ Static Files
+    var webRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+    if (!Directory.Exists(webRootPath))
+    {
+        Directory.CreateDirectory(webRootPath);
+    }
+    var imagesDir = Path.Combine(webRootPath, "images");
+    if (!Directory.Exists(imagesDir))
+    {
+        Directory.CreateDirectory(imagesDir);
+    }
+    builder.Environment.WebRootPath = webRootPath;
+
+    // 1. Cấu hình Serilog Logging
     builder.Host.UseSerilog((context, services, configuration) =>
     {
         configuration
@@ -29,54 +44,41 @@ try
             .Enrich.FromLogContext();
     });
 
-    // 1. Cấu hình CORS cho phép mọi nguồn (hỗ trợ cả http, https và Frontend)
+    // 2. Cấu hình CORS theo danh sách Origin được phép (đọc từ cấu hình, mặc định cho Next.js :3000 & Vite :5173)
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? new[]
+        {
+            "http://localhost:3000",
+            "https://localhost:3000",
+            "http://localhost:5173",
+            "https://localhost:5173"
+        };
+
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy("AllowAll", policy =>
+        options.AddPolicy("AllowFrontend", policy =>
         {
-            policy.AllowAnyOrigin()
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .AllowAnyHeader();
+                  .AllowCredentials();
         });
     });
 
-    // 2. Cấu hình Controllers
-    builder.Services.AddControllers();
-
-    // 3. Cấu hình DbContext (Hỗ trợ UseInMemoryDatabase khi phát triển/test, hoặc SQL Server)
-    var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase", false);
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
-    builder.Services.AddDbContext<AppDbContext>(options =>
-    {
-        if (useInMemory || string.IsNullOrEmpty(connectionString))
-        {
-            options.UseInMemoryDatabase("HouseRentalAPIDb");
-        }
-        else
-        {
-            options.UseSqlServer(connectionString);
-        }
-    });
-
-    // 4. Đăng ký Dependency Injection (Repository & Service)
-    builder.Services.AddScoped<IUserRepository, UserRepository>();
-    builder.Services.AddScoped<IUserService, UserService>();
-    builder.Services.AddScoped<IAuthRepository, AuthRepository>();
-    builder.Services.AddScoped<IAuthService, AuthService>();
-    builder.Services.AddScoped<IFileRepository, FileRepository>();
-    builder.Services.AddScoped<IFileService, FileService>();
-
-    // Cấu hình FileSettings sử dụng Options Pattern
+    // 3. Cấu hình Options Pattern cho FileSettings (Buổi 10)
     builder.Services.Configure<FileSettings>(builder.Configuration.GetSection(FileSettings.SectionName));
-    if (builder.Configuration["MaxImageSize"] != null && long.TryParse(builder.Configuration["MaxImageSize"], out var maxImgSize))
+
+    // 4. Đọc JwtSettings từ Configuration (appsettings / User Secrets / Environment Variables — không hardcode secret)
+    var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+    var secretKey = jwtSettings["SecretKey"];
+    if (string.IsNullOrWhiteSpace(secretKey) || secretKey.Length < 32)
     {
-        builder.Services.PostConfigure<FileSettings>(options => options.MaxImageSize = maxImgSize);
+        throw new InvalidOperationException(
+            "Thiếu cấu hình JwtSettings:SecretKey (tối thiểu 32 ký tự). Hãy cấu hình qua User Secrets, Environment Variables hoặc appsettings.");
     }
 
-    // 5. Cấu hình Authentication & JWT Bearer
-    var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-    var secretKey = jwtSettings["SecretKey"] ?? "Scretkey123456789123456789123456789123456789";
+    var jwtIssuer = jwtSettings["Issuer"] ?? "https://localhost:7255";
+    var jwtAudience = jwtSettings["Audience"] ?? "https://localhost:7255";
 
     builder.Services.AddAuthentication(options =>
     {
@@ -89,38 +91,40 @@ try
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateIssuer = true,
+            ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-            ClockSkew = TimeSpan.Zero,
-            RoleClaimType = ClaimTypes.Role
+            RoleClaimType = ClaimTypes.Role,
+            ClockSkew = TimeSpan.Zero
         };
     });
 
-    // Đăng ký Custom Authorization Handler
+    // 5. Cấu hình Authorization & Policies (Buổi 9)
     builder.Services.AddSingleton<IAuthorizationHandler, MinimumAgeHandler>();
-
-    // Cấu hình Authorization & Policies
     builder.Services.AddAuthorization(options =>
     {
-        // 3. Triển khai Policy "MustBeHR" để kiểm tra Claim "Department" có giá trị là "HR"
         options.AddPolicy("MustBeHR", policy =>
             policy.RequireClaim("Department", "HR"));
 
-        // 5. Triển khai Policy kiểm tra độ tuổi tối thiểu (MinimumAgeRequirement)
         options.AddPolicy("AtLeast18", policy =>
             policy.Requirements.Add(new MinimumAgeRequirement(18)));
     });
 
-    // 2. Bổ sung đoạn này để hiện nút Authorize trên Swagger
+    // 6. Cấu hình Swagger nâng cao kèm Bearer JWT Auth & XML Docs (Buổi 13)
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
-        options.SwaggerDoc("v1", new OpenApiInfo { Title = "ProjectAPIdemo", Version = "v1" });
+        options.SwaggerDoc("v1", new OpenApiInfo
+        {
+            Title = "House Rental Management System API",
+            Version = "v1",
+            Description = "Hệ thống Quản lý Cho thuê Nhà - ASP.NET Core Web API (.NET 10)"
+        });
 
-        // Định nghĩa khung nhập Token
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
             Name = "Authorization",
@@ -128,10 +132,9 @@ try
             Scheme = "Bearer",
             BearerFormat = "JWT",
             In = ParameterLocation.Header,
-            Description = "Nhập trực tiếp chuỗi Token thu được sau khi Login."
+            Description = "Nhập JWT token thu được sau khi đăng nhập (ví dụ: login admin/123456)."
         });
 
-        // Áp dụng khung nhập Token cho toàn bộ API
         options.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
         {
             {
@@ -139,40 +142,94 @@ try
                 new List<string>()
             }
         });
+
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (File.Exists(xmlPath))
+        {
+            options.IncludeXmlComments(xmlPath);
+        }
     });
 
     builder.Services.AddOpenApi();
 
+    // 7. Đăng ký AppDbContext (Hỗ trợ SQL Server mặc định hoặc UseInMemoryDatabase khi test nhanh)
+    var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase", false);
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        if (useInMemory || string.IsNullOrWhiteSpace(connectionString))
+        {
+            options.UseInMemoryDatabase("HouseRentalAPIDb");
+        }
+        else
+        {
+            options.UseSqlServer(connectionString);
+        }
+    });
+
+    // 8. Đăng ký Dependency Injection (Chuẩn kiến trúc N-Tier Buổi 7 & 14)
+    builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<IUserService, UserService>();
+    builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+    builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<IHouseRepository, HouseRepository>();
+    builder.Services.AddScoped<IHouseService, HouseService>();
+    builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+    builder.Services.AddScoped<IBookingService, BookingService>();
+    builder.Services.AddScoped<IContractRepository, ContractRepository>();
+    builder.Services.AddScoped<IContractService, ContractService>();
+    builder.Services.AddScoped<IFileRepository, FileRepository>();
+    builder.Services.AddScoped<IFileService, FileService>();
+
+    builder.Services.AddControllers();
+
     var app = builder.Build();
 
-    // Tự động khởi tạo & Seed dữ liệu người dùng mẫu chuẩn mã hóa HMACSHA512 vào CSDL
+    // 9. Tự động Khởi tạo & Seed dữ liệu mẫu hệ thống thuê nhà (Buổi 15)
     using (var scope = app.Services.CreateScope())
     {
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        DbInitializer.Seed(context);
+        try
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            DbInitializer.Seed(context);
+        }
+        catch (Exception ex) when (ex is not HostAbortedException)
+        {
+            Log.Warning(ex, "Không thể kết nối CSDL để SeedData tự động khi khởi động. Hãy đảm bảo đã chạy Database_HouseRental.sql trên SSMS hoặc bật UseInMemoryDatabase.");
+        }
     }
 
+    // 10. Pipeline Middlewares (Global Exception & Request Logging ở đầu pipeline)
     app.UseExceptionHandling();
     app.UseRequestLogging();
 
-    // Configure the HTTP request pipeline.
+    // Chỉ bật Swagger ở môi trường Development (Buổi 13 Best Practice)
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
         app.UseSwagger();
         app.UseSwaggerUI();
+
+        app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
     }
 
-    // Bật Static Files để phục vụ ảnh và file từ wwwroot
-    app.UseStaticFiles();
+    // Bật Static Files phục vụ ảnh nhà thuê từ wwwroot/images cho Frontend (Buổi 10)
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRootPath),
+        RequestPath = ""
+    });
 
-    // Bật CORS cho mọi yêu cầu
-    app.UseCors("AllowAll");
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
 
-    // Tắt chuyển hướng HttpsRedirection trên local để hỗ trợ chạy trực tiếp trên cả http://localhost:5066 và https://localhost:7255
-    // app.UseHttpsRedirection();
+    // CORS đặt trước Authentication / Authorization (Buổi 13)
+    app.UseCors("AllowFrontend");
 
-    // 7. Bật Authentication trước Authorization
     app.UseAuthentication();
     app.UseAuthorization();
 
@@ -180,7 +237,7 @@ try
 
     app.Run();
 }
-catch (Exception ex)
+catch (Exception ex) when (ex is not HostAbortedException)
 {
     Log.Fatal(ex, "Ứng dụng dừng bất thường khi khởi động.");
 }

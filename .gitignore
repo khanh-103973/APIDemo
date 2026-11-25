@@ -19,14 +19,33 @@ publish/
 *.log
 *.tmp
 *.temp
-APIDemo/Logs/
-APIDemo/wwwroot/images/
-APIDemo/wwwroot/uploads/
+APIDemo/Logs/*
+!APIDemo/Logs/.gitkeep
+
 
 ## Local environment / secrets
 .env
+.env*.local
 *.local.json
+
+## Frontend (Next.js / Node)
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
 
 ## OS files
 Thumbs.db
 Desktop.ini
+
+## Slides & Presentation Documents
+*.pdf
+*.pptx
+*.ppt
+
+## Uploaded Files / Test artifacts
+APIDemo/wwwroot/images/*
+!APIDemo/wwwroot/images/.gitkeep
+test_results.json
+*.ps1
+

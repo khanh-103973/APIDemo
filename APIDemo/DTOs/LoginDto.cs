@@ -4,15 +4,14 @@ namespace APIDemo.DTOs
 {
     public class LoginDto
     {
-        [Required(ErrorMessage = "Username khong duoc de trong.")]
-        [StringLength(50, MinimumLength = 3, ErrorMessage = "Username phai tu 3 den 50 ky tu.")]
+        [Required(ErrorMessage = "Tên đăng nhập không được để trống.")]
+        [StringLength(50, MinimumLength = 3, ErrorMessage = "Tên đăng nhập phải từ 3 đến 50 ký tự.")]
         public string Username { get; set; } = string.Empty;
 
-        [EmailAddress(ErrorMessage = "Email khong dung dinh dang.")]
-        public string Email { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Mat khau khong duoc de trong.")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Mat khau phai tu 6 den 100 ky tu.")]
+        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu phải từ 6 đến 100 ký tự.")]
         public string Password { get; set; } = string.Empty;
+
+        public string? Email { get; set; }
     }
 }

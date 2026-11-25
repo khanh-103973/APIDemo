@@ -1,4 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -21,57 +21,123 @@ namespace APIDemo.Services
             _configuration = configuration;
         }
 
-        public async Task<string?> LoginAsync(UserLoginDto dto)
+        public async Task<AuthResponseDto> RegisterAsync(UserRegisterDto dto)
         {
-            // 1. Tìm kiếm người dùng trong Cơ sở dữ liệu theo Username
-            var user = await _authRepository.GetByUsernameAsync(dto.Username);
-            if (user == null)
+            if (await _authRepository.ExistsByUsernameAsync(dto.Username))
             {
-                throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không chính xác.");
+                throw new ConflictException($"Tên đăng nhập '{dto.Username}' đã tồn tại trong hệ thống.");
             }
 
-            // 2. Xác thực mật khẩu bằng cơ chế HMACSHA512 với PasswordSalt lưu trong CSDL
+            if (await _authRepository.ExistsByEmailAsync(dto.Email))
+            {
+                throw new ConflictException($"Email '{dto.Email}' đã được sử dụng.");
+            }
+
+            CreatePasswordHash(dto.Password, out var hash, out var salt);
+
+            var user = new User
+            {
+                Username = dto.Username.Trim(),
+                FullName = dto.FullName.Trim(),
+                Email = dto.Email.Trim().ToLowerInvariant(),
+                PasswordHash = hash,
+                PasswordSalt = salt,
+                Phone = string.IsNullOrWhiteSpace(dto.Phone) ? "0912345678" : dto.Phone.Trim(),
+                Role = string.IsNullOrWhiteSpace(dto.Role) ? "Tenant" : dto.Role.Trim(),
+                Department = string.IsNullOrWhiteSpace(dto.Department) ? "General" : dto.Department.Trim(),
+                DateOfBirth = dto.DateOfBirth,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _authRepository.CreateUserAsync(user);
+
+            var (token, expiresAt) = GenerateJwtToken(user);
+
+            return new AuthResponseDto
+            {
+                Message = "Đăng ký tài khoản thành công!",
+                Token = token,
+                ExpiresAt = expiresAt,
+                User = new AuthUserDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    FullName = user.FullName,
+                    Email = user.Email,
+                    Role = user.Role,
+                    Department = user.Department,
+                    DateOfBirth = user.DateOfBirth
+                }
+            };
+        }
+
+        public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
+        {
+            var identifier = dto.Username.Trim();
+            var user = await _authRepository.GetByUsernameAsync(identifier)
+                ?? await _authRepository.GetByEmailAsync(identifier.ToLowerInvariant());
+            if (user == null) return null;
+
+            // Băm lại mật khẩu vừa nhập bằng Salt của user trong DB
             if (user.PasswordSalt != null && user.PasswordHash != null && user.PasswordSalt.Length > 0)
             {
                 using var hmac = new HMACSHA512(user.PasswordSalt);
                 var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dto.Password));
 
-                // So sánh từng byte của mảng hash để chống tấn công Timing Attack
+                // So sánh từng byte an toàn chống Timing Attack
                 if (!CryptographicOperations.FixedTimeEquals(computedHash, user.PasswordHash))
                 {
-                    throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không chính xác.");
+                    return null; // Sai mật khẩu
                 }
             }
-            else if (string.IsNullOrEmpty(user.Password) || user.Password != dto.Password)
+            else
             {
-                throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không chính xác.");
+                return null;
             }
 
-            // 3. Đăng nhập thành công -> Tạo JWT Token từ dữ liệu thực của User trong CSDL
-            return GenerateJwtToken(user);
+            var (token, expiresAt) = GenerateJwtToken(user);
+
+            return new AuthResponseDto
+            {
+                Message = "Đăng nhập thành công!",
+                Token = token,
+                ExpiresAt = expiresAt,
+                User = new AuthUserDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    FullName = user.FullName,
+                    Email = user.Email,
+                    Role = user.Role,
+                    Department = user.Department,
+                    DateOfBirth = user.DateOfBirth
+                }
+            };
         }
 
-        private string GenerateJwtToken(User user)
+        private (string Token, DateTime ExpiresAt) GenerateJwtToken(User user)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
-            var secretKeyString = jwtSettings["SecretKey"] ?? "Scretkey123456789123456789123456789123456789";
+            var secretKeyString = jwtSettings["SecretKey"];
+            if (string.IsNullOrWhiteSpace(secretKeyString) || secretKeyString.Length < 32)
+            {
+                throw new InvalidOperationException("Thiếu cấu hình JwtSettings:SecretKey.");
+            }
             var secretKey = Encoding.UTF8.GetBytes(secretKeyString);
 
-            // Khai báo các Claims thực tế lấy từ thuộc tính của User trong CSDL
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role), // Role thực tế (Admin, Manager, Staff,...)
-                new Claim("Department", user.Department ?? "General") // Claim Department thực tế
+                new Claim(ClaimTypes.Role, user.Role),
+                new Claim("Department", user.Department ?? "General")
             };
 
-            // Nếu người dùng có ngày sinh trong CSDL thì đưa vào Claim
             if (user.DateOfBirth.HasValue)
             {
                 var dobString = user.DateOfBirth.Value.ToString("yyyy-MM-dd");
                 claims.Add(new Claim(ClaimTypes.DateOfBirth, dobString));
-                claims.Add(new Claim("DateOfBirth", dobString)); // Phục vụ Custom Requirement Handler
+                claims.Add(new Claim("DateOfBirth", dobString));
             }
 
             var key = new SymmetricSecurityKey(secretKey);
@@ -80,16 +146,24 @@ namespace APIDemo.Services
             var issuer = jwtSettings["Issuer"] ?? "https://localhost:7255";
             var audience = jwtSettings["Audience"] ?? "https://localhost:7255";
             var expiryMinutes = double.TryParse(jwtSettings["ExpiryMinutes"], out var minutes) ? minutes : 60;
+            var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
             var token = new JwtSecurityToken(
                 issuer: issuer,
                 audience: audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(expiryMinutes),
+                expires: expiresAt,
                 signingCredentials: creds
             );
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+        }
+
+        private static void CreatePasswordHash(string password, out byte[] hash, out byte[] salt)
+        {
+            using var hmac = new HMACSHA512();
+            salt = hmac.Key;
+            hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
         }
     }
 }

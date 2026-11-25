@@ -1,4 +1,4 @@
-namespace APIDemo.Exceptions
+﻿namespace APIDemo.Exceptions
 {
     public class AppException : Exception
     {
@@ -31,6 +31,14 @@ namespace APIDemo.Exceptions
     {
         public UnauthorizedException(string message)
             : base(message, StatusCodes.Status401Unauthorized)
+        {
+        }
+    }
+
+    public class ConflictException : AppException
+    {
+        public ConflictException(string message)
+            : base(message, StatusCodes.Status409Conflict)
         {
         }
     }

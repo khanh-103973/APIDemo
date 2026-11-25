@@ -1,0 +1,101 @@
+import { User, LandlordProfile, TenantProfile } from "@/types";
+
+export const mockUsers: User[] = [
+  {
+    id: "usr_admin_1",
+    name: "Nguyễn Văn Quản Trị",
+    email: "admin@houserental.vn",
+    phone: "0901234567",
+    role: "admin",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
+    createdAt: "01/01/2026",
+  },
+  {
+    id: "usr_landlord_1",
+    name: "Trần Minh Đức",
+    email: "minhduc.tran@gmail.com",
+    phone: "0912345678",
+    role: "landlord",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    createdAt: "15/02/2026",
+  },
+  {
+    id: "usr_landlord_2",
+    name: "Lê Thị Hương",
+    email: "huong.le@bds-saigon.vn",
+    phone: "0987654321",
+    role: "landlord",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    createdAt: "10/03/2026",
+  },
+  {
+    id: "usr_tenant_1",
+    name: "Phạm Văn Khang",
+    email: "khang.pham@dev.vn",
+    phone: "0933456789",
+    role: "tenant",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    createdAt: "01/04/2026",
+  },
+  {
+    id: "usr_tenant_2",
+    name: "Hoàng Mai Anh",
+    email: "maianh.hoang@design.com",
+    phone: "0944567890",
+    role: "tenant",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+    createdAt: "12/05/2026",
+  },
+];
+
+export const mockLandlordProfiles: Record<string, LandlordProfile> = {
+  usr_landlord_1: {
+    id: "lp_1",
+    userId: "usr_landlord_1",
+    verificationStatus: "verified",
+    identityCardNumber: "079088123456",
+    businessName: "Căn hộ dịch vụ Minh Đức",
+    address: "128 Điện Biên Phủ, Phường 15, Quận Bình Thạnh, TP. Hồ Chí Minh",
+    taxNumber: "8492019482",
+    verifiedAt: "20/02/2026",
+    responseRate: 98,
+    responseTime: "Trong vòng 1 giờ",
+  },
+  usr_landlord_2: {
+    id: "lp_2",
+    userId: "usr_landlord_2",
+    verificationStatus: "verified",
+    identityCardNumber: "001192039485",
+    businessName: "Hương House Saigon",
+    address: "45/2 Nguyễn Thị Minh Khai, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+    verifiedAt: "15/03/2026",
+    responseRate: 95,
+    responseTime: "Trong vòng 2 giờ",
+  },
+};
+
+export const mockTenantProfiles: Record<string, TenantProfile> = {
+  usr_tenant_1: {
+    id: "tp_1",
+    userId: "usr_tenant_1",
+    idCardNumber: "079099876543",
+    dateOfBirth: "15/08/1997",
+    occupation: "Kỹ sư phần mềm",
+    emergencyContactName: "Phạm Văn Long (Bố)",
+    emergencyContactPhone: "0908765432",
+  },
+  usr_tenant_2: {
+    id: "tp_2",
+    userId: "usr_tenant_2",
+    idCardNumber: "001198765432",
+    dateOfBirth: "20/11/1999",
+    occupation: "Nhà thiết kế sản phẩm",
+    emergencyContactName: "Trần Thu Hà (Mẹ)",
+    emergencyContactPhone: "0918273645",
+  },
+};

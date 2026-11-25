@@ -1,29 +1,26 @@
-using System.ComponentModel.DataAnnotations;
-
-namespace APIDemo.DTOs.Common
+﻿namespace APIDemo.DTOs.Common
 {
     public class UserQueryParameters
     {
-        public const int MaxPageSize = 50;
+        private const int MaxPageSize = 50; // Giới hạn tối đa 50 bản ghi/trang để chống quá tải server
 
-        [Range(1, int.MaxValue)]
-        public int PageNumber { get; set; } = 1;
+        public int PageNumber { get; set; } = 1; // Mặc định là trang 1
 
-        [Range(1, MaxPageSize)]
-        public int PageSize { get; set; } = 10;
+        private int _pageSize = 10;
+        public int PageSize
+        {
+            get => _pageSize;
+            set => _pageSize = (value > MaxPageSize) ? MaxPageSize : value;
+        }
 
-        // Tìm theo tên đăng nhập, họ tên hoặc email.
-        [StringLength(100)]
+        // Search: Từ khóa tìm kiếm chung (Username, Email, FullName...)
         public string? SearchTerm { get; set; }
 
-        [StringLength(20)]
+        // Filter: Lọc theo trường cụ thể (ví dụ: Role Admin/User)
         public string? Role { get; set; }
 
-        [Required]
-        [RegularExpression("(?i)^(id|username|fullname|email|role|createdat)$",
-            ErrorMessage = "SortBy phải là id, username, fullname, email, role hoặc createdat.")]
-        public string SortBy { get; set; } = "username";
-
-        public bool IsDescending { get; set; }
+        // Sort: Sắp xếp theo cột nào và tăng hay giảm dần
+        public string? SortBy { get; set; } // Ví dụ: "username", "email", "createdat"
+        public bool IsDescending { get; set; } = false; // false = Tăng dần (ASC), true = Giảm dần (DESC)
     }
 }

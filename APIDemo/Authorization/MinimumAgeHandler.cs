@@ -9,9 +9,8 @@ namespace APIDemo.Authorization
             AuthorizationHandlerContext context,
             MinimumAgeRequirement requirement)
         {
-            // Tìm Claim DateOfBirth
-            var dateOfBirthClaim = context.User.FindFirst(c =>
-                c.Type == ClaimTypes.DateOfBirth || c.Type == "DateOfBirth");
+            var dateOfBirthClaim = context.User.FindFirst("DateOfBirth")
+                ?? context.User.FindFirst(ClaimTypes.DateOfBirth);
 
             if (dateOfBirthClaim == null)
             {
@@ -20,11 +19,8 @@ namespace APIDemo.Authorization
 
             if (DateTime.TryParse(dateOfBirthClaim.Value, out var dateOfBirth))
             {
-                var today = DateTime.Today;
-                var calculatedAge = today.Year - dateOfBirth.Year;
-
-                // Nếu chưa đến sinh nhật năm nay thì trừ đi 1 tuổi
-                if (dateOfBirth.Date > today.AddYears(-calculatedAge))
+                var calculatedAge = DateTime.Today.Year - dateOfBirth.Year;
+                if (dateOfBirth.Date > DateTime.Today.AddYears(-calculatedAge))
                 {
                     calculatedAge--;
                 }

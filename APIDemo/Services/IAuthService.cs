@@ -1,9 +1,10 @@
-using APIDemo.DTOs;
+﻿using APIDemo.DTOs;
 
 namespace APIDemo.Services
 {
     public interface IAuthService
     {
-        Task<string?> LoginAsync(UserLoginDto dto);
+        Task<AuthResponseDto?> LoginAsync(LoginDto dto);
+        Task<AuthResponseDto> RegisterAsync(UserRegisterDto dto);
     }
 }

@@ -1,8 +1,5 @@
-using APIDemo.Data;
-using APIDemo.DTOs;
-using APIDemo.Models;
+﻿using APIDemo.DTOs;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Controllers
 {
@@ -10,46 +7,30 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
-        private readonly AppDbContext _context;
-
-        public ProductsController(AppDbContext context)
-        {
-            _context = context;
-        }
-
         [HttpGet]
-        public async Task<IActionResult> GetProducts()
+        public IActionResult GetProducts()
         {
-            var products = await _context.Products.Include(p => p.Category).ToListAsync();
-            return Ok(products);
+            return Ok(new[]
+            {
+                new
+                {
+                    Id = 1,
+                    Name = "Laptop",
+                    Price = 20000000
+                },
+
+                new
+                {
+                    Id = 2,
+                    Name = "Mouse",
+                    Price = 500000
+                }
+            });
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] ProductDto dto)
+        public IActionResult Create(ProductDto product)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            var category = await _context.Categories.FirstOrDefaultAsync();
-            if (category == null)
-            {
-                category = new Category { Name = "Mặc định" };
-                _context.Categories.Add(category);
-                await _context.SaveChangesAsync();
-            }
-
-            var product = new Product
-            {
-                Name = dto.Name,
-                Price = dto.Price,
-                CategoryId = category.Id
-            };
-
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
-
             return Ok(product);
         }
     }

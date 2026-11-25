@@ -1,0 +1,41 @@
+import { ViewingRequest } from "@/types";
+
+export const mockViewingRequests: ViewingRequest[] = [
+  {
+    id: "vr_101",
+    listingId: "list_1",
+    tenantId: "usr_tenant_1",
+    landlordId: "usr_landlord_1",
+    preferredDate: "28/02/2026",
+    preferredTimeSlot: "14:00 - 15:00",
+    status: "confirmed",
+    tenantNote: "Mình muốn xem phòng và chỗ để xe máy.",
+    landlordNote: "Đã xác nhận hẹn bạn tại sảnh lúc 14h, bấm chuông số 101 nhé.",
+    createdAt: "26/02/2026",
+    updatedAt: "26/02/2026",
+  },
+  {
+    id: "vr_102",
+    listingId: "list_2",
+    tenantId: "usr_tenant_2",
+    landlordId: "usr_landlord_2",
+    preferredDate: "05/03/2026",
+    preferredTimeSlot: "10:00 - 11:00",
+    status: "pending",
+    tenantNote: "Tôi muốn xem phòng trước khi quyết định đặt cọc.",
+    createdAt: "03/03/2026",
+    updatedAt: "03/03/2026",
+  },
+  {
+    id: "vr_103",
+    listingId: "list_3",
+    tenantId: "usr_tenant_1",
+    landlordId: "usr_landlord_1",
+    preferredDate: "10/01/2026",
+    preferredTimeSlot: "16:00 - 17:00",
+    status: "completed",
+    tenantNote: "Đã đến xem và hoàn thành ký hợp đồng phòng khác.",
+    createdAt: "08/01/2026",
+    updatedAt: "10/01/2026",
+  },
+];

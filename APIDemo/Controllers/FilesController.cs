@@ -27,45 +27,20 @@ namespace APIDemo.Controllers
         }
 
         // ==========================================
-        // 1. BÀI 1: Upload file cơ bản (Bắt buộc chọn file, size > 0)
+        // 1. Upload ảnh nhà cho thuê vào wwwroot/images (Phục vụ trực tiếp cho Frontend)
         // ==========================================
         /// <summary>
-        /// Bài 1: Yêu cầu bắt buộc Client phải chọn file và kích thước > 0. Nếu không báo lỗi 400 BadRequest.
-        /// </summary>
-        [HttpPost("upload-basic")]
-        [Consumes("multipart/form-data")]
-        public IActionResult UploadBasic(IFormFile? file)
-        {
-            if (file == null || file.Length == 0)
-            {
-                throw new BadRequestException("Vui lòng chọn file và kích thước file phải lớn hơn 0.");
-            }
-
-            return Ok(new
-            {
-                message = "File hợp lệ.",
-                fileName = file.FileName,
-                size = file.Length
-            });
-        }
-
-        // ==========================================
-        // 2 & 3. BÀI 2 & 3: File Validation (.jpg, .png, <= 3MB từ Options Pattern) + Random tên file -> wwwroot/images
-        // ==========================================
-        /// <summary>
-        /// Bài 2 & 3: Chỉ cho phép ảnh (.jpg, .png), tối đa 3MB (dùng Options Pattern từ appsettings.json), random tên file và lưu vào wwwroot/images.
+        /// Upload ảnh nhà cho thuê vào thư mục wwwroot/images. Kiểm tra định dạng (.jpg, .jpeg, .png) và kích thước (Options Pattern).
         /// </summary>
         [HttpPost("upload-image")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadImage(IFormFile? file)
         {
-            // 1. Bắt buộc chọn file và kích thước > 0
             if (file == null || file.Length == 0)
             {
-                throw new BadRequestException("Vui lòng chọn file và kích thước file phải lớn hơn 0.");
+                throw new BadRequestException("Vui lòng chọn file ảnh và kích thước file phải lớn hơn 0.");
             }
 
-            // 2. Validate định dạng (.jpg, .png)
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (!_fileSettings.AllowedExtensions.Contains(extension))
             {
@@ -73,7 +48,6 @@ namespace APIDemo.Controllers
                     $"Chỉ cho phép tải lên file ảnh có định dạng: {string.Join(", ", _fileSettings.AllowedExtensions)}.");
             }
 
-            // 3. Validate kích thước sử dụng Options Pattern (MaxImageSize từ appsettings.json)
             if (file.Length > _fileSettings.MaxImageSize)
             {
                 var maxMb = _fileSettings.MaxImageSize / (1024 * 1024);
@@ -81,7 +55,6 @@ namespace APIDemo.Controllers
                     $"Kích thước file vượt quá giới hạn cho phép ({maxMb}MB). Kích thước file của bạn: {file.Length / 1024} KB.");
             }
 
-            // 4. Tạo thư mục wwwroot/images nếu chưa có
             var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
             var imagesFolder = Path.Combine(webRoot, "images");
             if (!Directory.Exists(imagesFolder))
@@ -89,7 +62,6 @@ namespace APIDemo.Controllers
                 Directory.CreateDirectory(imagesFolder);
             }
 
-            // 5. Random tên file để chống ghi đè (sử dụng Guid)
             var uniqueFileName = $"{Guid.NewGuid()}{extension}";
             var filePath = Path.Combine(imagesFolder, uniqueFileName);
 
@@ -110,30 +82,10 @@ namespace APIDemo.Controllers
         }
 
         // ==========================================
-        // 4. API đọc cấu hình Environment và trả về tên môi trường đang chạy
+        // 2. Upload nhiều ảnh cùng lúc cho bộ sưu tập nhà thuê
         // ==========================================
         /// <summary>
-        /// API đọc cấu hình Environment và trả về tên môi trường đang chạy (vd: Development, Production).
-        /// </summary>
-        [HttpGet("environment")]
-        public IActionResult GetEnvironment()
-        {
-            return Ok(new
-            {
-                environmentName = _environment.EnvironmentName,
-                isDevelopment = _environment.IsDevelopment(),
-                isProduction = _environment.IsProduction(),
-                isStaging = _environment.IsEnvironment("Staging"),
-                contentRootPath = _environment.ContentRootPath,
-                webRootPath = _environment.WebRootPath
-            });
-        }
-
-        // ==========================================
-        // 5. Upload nhiều file cùng lúc (List<IFormFile>) kết hợp Options Pattern
-        // ==========================================
-        /// <summary>
-        /// Upload nhiều file cùng lúc (List<IFormFile>) kết hợp Options Pattern cho cấu hình.
+        /// Upload nhiều file ảnh cùng lúc cho bộ sưu tập phòng/nhà (List&lt;IFormFile&gt;).
         /// </summary>
         [HttpPost("upload-multiple")]
         [Consumes("multipart/form-data")]
@@ -141,15 +93,14 @@ namespace APIDemo.Controllers
         {
             if (files == null || files.Count == 0)
             {
-                throw new BadRequestException("Vui lòng chọn ít nhất 1 file để tải lên.");
+                throw new BadRequestException("Vui lòng chọn ít nhất 1 file ảnh để tải lên.");
             }
 
-            // 1. Kiểm tra validation toàn bộ các file trước khi tiến hành lưu
             foreach (var file in files)
             {
                 if (file.Length == 0)
                 {
-                    throw new BadRequestException($"File '{file.FileName}' có kích thước bằng 0 (rỗng).");
+                    throw new BadRequestException($"File '{file.FileName}' có kích thước bằng 0.");
                 }
 
                 var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -163,11 +114,10 @@ namespace APIDemo.Controllers
                 {
                     var maxMb = _fileSettings.MaxImageSize / (1024 * 1024);
                     throw new BadRequestException(
-                        $"File '{file.FileName}' vượt quá dung lượng tối đa cho phép ({maxMb}MB).");
+                        $"File '{file.FileName}' vượt quá dung lượng tối đa ({maxMb}MB).");
                 }
             }
 
-            // 2. Lưu các file hợp lệ vào wwwroot/images
             var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
             var imagesFolder = Path.Combine(webRoot, "images");
             if (!Directory.Exists(imagesFolder))
@@ -199,14 +149,30 @@ namespace APIDemo.Controllers
 
             return Ok(new
             {
-                message = $"Đã tải lên thành công {files.Count} file.",
+                message = $"Đã tải lên thành công {files.Count} file ảnh.",
                 totalFiles = files.Count,
                 files = uploadedList
             });
         }
 
         // ==========================================
-        // UPLOAD & DOWNLOAD FILE TỪ DATABASE (THEO ID)
+        // 3. API đọc thông tin môi trường chạy (Buổi 10)
+        // ==========================================
+        [HttpGet("environment")]
+        public IActionResult GetEnvironment()
+        {
+            return Ok(new
+            {
+                environmentName = _environment.EnvironmentName,
+                isDevelopment = _environment.IsDevelopment(),
+                isProduction = _environment.IsProduction(),
+                contentRootPath = _environment.ContentRootPath,
+                webRootPath = _environment.WebRootPath
+            });
+        }
+
+        // ==========================================
+        // 4. Upload & Download file nhị phân vào Database
         // ==========================================
         [HttpPost("upload")]
         [Consumes("multipart/form-data")]
@@ -216,15 +182,16 @@ namespace APIDemo.Controllers
             return Ok(result);
         }
 
-        /// <summary>
-        /// Tải file từ Database theo Id.
-        /// </summary>
-        [HttpGet("download/{id:int}")]
         [HttpGet("{id:int}")]
+        [HttpGet("download/{id:int}")]
         public async Task<IActionResult> Download(int id)
         {
-            var fileDto = await _fileService.GetFileForDownloadAsync(id)
-                ?? throw new NotFoundException("Không tìm thấy file yêu cầu.");
+            var fileDto = await _fileService.GetFileForDownloadAsync(id);
+
+            if (fileDto == null)
+            {
+                throw new NotFoundException("Không tìm thấy file yêu cầu.");
+            }
 
             return File(fileDto.Content, fileDto.ContentType, fileDto.FileName);
         }

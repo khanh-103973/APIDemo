@@ -1,9 +1,8 @@
-using APIDemo.Data;
+using APIDemo.DTOs;
 using APIDemo.Exceptions;
-using APIDemo.Models;
+using APIDemo.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace APIDemo.Controllers
 {
@@ -11,91 +10,78 @@ namespace APIDemo.Controllers
     [Route("api/[controller]")]
     public class BookingsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IBookingService _bookingService;
 
-        public BookingsController(AppDbContext context)
+        // Inject IBookingService thay vì AppDbContext
+        public BookingsController(IBookingService bookingService)
         {
-            _context = context;
+            _bookingService = bookingService;
         }
 
-        // GET /api/bookings
+        // 1. GET /api/bookings (Lấy danh sách đặt phòng, hỗ trợ lọc theo trạng thái)
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? status)
         {
-            var query = _context.Bookings.AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(status))
-            {
-                query = query.Where(b => b.Status.ToLower() == status.ToLower());
-            }
-
-            var bookings = await query.ToListAsync();
+            var bookings = await _bookingService.GetAllBookingsAsync(status);
             return Ok(bookings);
         }
 
-        // GET /api/bookings/1
+        // 2. GET /api/bookings/{id} (Lấy chi tiết 1 lịch đặt phòng)
         [HttpGet("{id:int}")]
-        [Authorize(Roles = "User")]
         public async Task<IActionResult> GetById(int id)
         {
-            var booking = await _context.Bookings.FindAsync(id)
-                ?? throw new NotFoundException($"Khong tim thay lich thue nha Id = {id}");
+            var booking = await _bookingService.GetBookingByIdAsync(id)
+                ?? throw new NotFoundException($"Không tìm thấy lịch thuê nhà Id = {id}");
 
             return Ok(booking);
         }
 
-        // POST /api/bookings
+        // 3. POST /api/bookings (Tạo mới lịch đặt phòng - Yêu cầu người thuê từ 18 tuổi trở lên theo Policy AtLeast18)
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] Booking booking)
+        [Authorize(Policy = "AtLeast18")]
+        public async Task<IActionResult> Create([FromBody] BookingDto dto)
         {
-            if (booking is null || booking.StartDate >= booking.EndDate)
+            var result = await _bookingService.CreateBookingAsync(dto);
+            if (!result.IsSuccess)
             {
-                throw new BadRequestException("Du lieu khong hop le.");
+                throw new BadRequestException(result.Message);
             }
-
-            booking.Id = 0;
-            booking.Status = string.IsNullOrWhiteSpace(booking.Status) ? "Pending" : booking.Status;
-
-            _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync();
 
             return CreatedAtAction(
                 nameof(GetById),
-                new { id = booking.Id },
-                booking);
+                new { id = result.Data!.Id },
+                result.Data);
         }
 
-        // PUT /api/bookings/1
+        // 4. PUT /api/bookings/{id} (Cập nhật lịch đặt phòng)
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Booking updated)
+        [Authorize]
+        public async Task<IActionResult> Update(int id, [FromBody] BookingDto dto)
         {
-            if (updated.StartDate >= updated.EndDate)
+            var result = await _bookingService.UpdateBookingAsync(id, dto);
+            if (!result.IsSuccess)
             {
-                throw new BadRequestException("Ngay bat dau phai nho hon ngay ket thuc.");
+                if (result.IsNotFound)
+                {
+                    throw new NotFoundException(result.Message);
+                }
+
+                throw new BadRequestException(result.Message);
             }
 
-            var booking = await _context.Bookings.FindAsync(id)
-                ?? throw new NotFoundException($"Khong tim thay lich thue nha Id = {id}");
-
-            booking.UserId = updated.UserId;
-            booking.HouseId = updated.HouseId;
-            booking.StartDate = updated.StartDate;
-            booking.EndDate = updated.EndDate;
-            booking.Status = updated.Status;
-
-            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // DELETE /api/bookings/1
+        // 5. DELETE /api/bookings/{id} (Xóa lịch đặt phòng)
         [HttpDelete("{id:int}")]
+        [Authorize]
         public async Task<IActionResult> Delete(int id)
         {
-            var booking = await _context.Bookings.FindAsync(id)
-                ?? throw new NotFoundException($"Khong tim thay lich thue nha Id = {id}");
-
-            _context.Bookings.Remove(booking);
-            await _context.SaveChangesAsync();
+            var result = await _bookingService.DeleteBookingAsync(id);
+            if (!result.IsSuccess)
+            {
+                throw new NotFoundException(result.Message);
+            }
 
             return NoContent();
         }

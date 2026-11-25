@@ -1,0 +1,258 @@
+/**
+ * House Rental System — Design System Tokens
+ * Compatible with Tailwind CSS v4 and shadcn/ui
+ *
+ * Architecture:
+ * - Base CSS variables defined on :root (and .dark for future expansion)
+ * - @theme inline exposes variables as Tailwind utility classes (e.g. bg-primary, text-foreground)
+ * - Separate variable names prevent self-referencing recursion in Tailwind v4
+ */
+
+:root {
+  /* =========================================================================
+     Base Surfaces & Typography
+     ========================================================================= */
+  --background: #FFFFFF;
+  --surface: #F8FAFC;
+  --foreground: #0F172A;
+
+  /* Card & Popover */
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+
+  /* =========================================================================
+     Brand & Action Tokens
+     ========================================================================= */
+  --primary: #7C3AED;
+  --primary-hover: #6D28D9;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #F4F0FF;
+  --secondary-foreground: #5B21B6;
+
+  --accent: #047857;
+  --accent-hover: #065F46;
+  --accent-foreground: #FFFFFF;
+
+  /* =========================================================================
+     Neutral & Structural Tokens
+     ========================================================================= */
+  --muted: #F1F5F9;
+  --muted-foreground: #475569;
+
+  --border: #CBD5E1;
+  --input: #8290A4;
+  --ring: #7C3AED;
+
+  /* =========================================================================
+     Semantic Status Tokens (Solid + Subtle + Border)
+     WCAG 2.2 AA Verified (Text >= 4.5:1, UI >= 3.0:1)
+     ========================================================================= */
+
+  /* Success (Paid, Verified, Active) */
+  --success: #15803D;
+  --success-foreground: #FFFFFF;
+  --success-subtle: #F0FDF4;
+  --success-subtle-foreground: #166534;
+  --success-border: #16A34A;
+
+  /* Warning (Pending, Expiring Soon, Maintenance) */
+  --warning: #B45309;
+  --warning-foreground: #FFFFFF;
+  --warning-subtle: #FFFBEB;
+  --warning-subtle-foreground: #92400E;
+  --warning-border: #D97706;
+
+  /* Danger / Destructive (Overdue, Rejected, Failed, Terminated) */
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --danger: #DC2626;
+  --danger-foreground: #FFFFFF;
+  --danger-subtle: #FEF2F2;
+  --danger-subtle-foreground: #991B1B;
+  --danger-border: #EF4444;
+
+  /* Info (System notices, Informational messages, Reserved) */
+  --info: #1D4ED8;
+  --info-foreground: #FFFFFF;
+  --info-subtle: #EFF6FF;
+  --info-subtle-foreground: #1E40AF;
+  --info-border: #3B82F6;
+
+  /* Neutral Status (Draft, Inactive, Archived) */
+  --neutral: #475569;
+  --neutral-foreground: #FFFFFF;
+  --neutral-subtle: #F8FAFC;
+  --neutral-subtle-foreground: #334155;
+  --neutral-border: #64748B;
+
+  /* =========================================================================
+     Layout & Geometry Tokens
+     ========================================================================= */
+  --radius-sm: 0.25rem;   /* 4px */
+  --radius-md: 0.375rem;  /* 6px - buttons, inputs */
+  --radius-lg: 0.5rem;    /* 8px - cards, dialogs */
+  --radius-xl: 0.75rem;   /* 12px - featured containers */
+  --radius: 0.5rem;       /* 8px default (shadcn compatible) */
+
+  /* Spacing Scale (Standard 6/10 Density) */
+  --space-xs: 0.25rem;   /* 4px */
+  --space-sm: 0.5rem;    /* 8px */
+  --space-md: 1rem;      /* 16px */
+  --space-lg: 1.5rem;    /* 24px */
+  --space-xl: 2rem;      /* 32px */
+  --space-2xl: 3rem;     /* 48px */
+  --space-3xl: 4rem;     /* 64px */
+
+  /* Elevation Shadows (Restrained, Professional) */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.04);
+  --shadow-xl: 0 20px 25px -5px rgb(15 23 42 / 0.08), 0 8px 10px -6px rgb(15 23 42 / 0.04);
+
+  /* Fonts */
+  --font-heading: 'Be Vietnam Pro', sans-serif;
+  --font-sans: 'Noto Sans', sans-serif;
+}
+
+/* =========================================================================
+   Dark Mode Readiness (Organized for future enablement, not active now)
+   ========================================================================= */
+.dark {
+  --background: #0B0F19;
+  --surface: #111827;
+  --foreground: #F8FAFC;
+
+  --card: #111827;
+  --card-foreground: #F8FAFC;
+  --popover: #111827;
+  --popover-foreground: #F8FAFC;
+
+  --primary: #8B5CF6;
+  --primary-hover: #A78BFA;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #1E1B4B;
+  --secondary-foreground: #C4B5FD;
+
+  --accent: #10B981;
+  --accent-hover: #059669;
+  --accent-foreground: #0B0F19;
+
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+
+  --border: #334155;
+  --input: #475569;
+  --ring: #8B5CF6;
+
+  --success: #22C55E;
+  --success-foreground: #0B0F19;
+  --success-subtle: #052E16;
+  --success-subtle-foreground: #86EFAC;
+  --success-border: #166534;
+
+  --warning: #F59E0B;
+  --warning-foreground: #0B0F19;
+  --warning-subtle: #451A03;
+  --warning-subtle-foreground: #FDE68A;
+  --warning-border: #92400E;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --danger: #EF4444;
+  --danger-foreground: #FFFFFF;
+  --danger-subtle: #450A0A;
+  --danger-subtle-foreground: #FCA5A5;
+  --danger-border: #991B1B;
+
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
+  --info-subtle: #172554;
+  --info-subtle-foreground: #93C5FD;
+  --info-border: #1E40AF;
+
+  --neutral: #64748B;
+  --neutral-foreground: #F8FAFC;
+  --neutral-subtle: #1E293B;
+  --neutral-subtle-foreground: #CBD5E1;
+  --neutral-border: #475569;
+}
+
+/* =========================================================================
+   Tailwind CSS v4 @theme inline Registration
+   Maps root variables to utility classes without circular alias collision
+   ========================================================================= */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Semantic Status Utilities */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-subtle-foreground: var(--success-subtle-foreground);
+  --color-success-border: var(--success-border);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-subtle-foreground: var(--warning-subtle-foreground);
+  --color-warning-border: var(--warning-border);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-subtle-foreground: var(--danger-subtle-foreground);
+  --color-danger-border: var(--danger-border);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-subtle-foreground: var(--info-subtle-foreground);
+  --color-info-border: var(--info-border);
+
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-subtle: var(--neutral-subtle);
+  --color-neutral-subtle-foreground: var(--neutral-subtle-foreground);
+  --color-neutral-border: var(--neutral-border);
+
+  /* Radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  /* Fonts */
+  --font-heading: var(--font-heading);
+  --font-sans: var(--font-sans);
+}

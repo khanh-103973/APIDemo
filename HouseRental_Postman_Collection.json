@@ -1,0 +1,863 @@
+{
+	"info": {
+		"_postman_id": "house-rental-system-api-v1",
+		"name": "House Rental System API - Project APIDemo",
+		"description": "Bộ sưu tập kiểm thử API đầy đủ cho Hệ thống Quản lý Cho thuê Nhà (HouseRentalDb) từ Buổi 1 đến Buổi 15.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Login (Lấy JWT Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var data = pm.response.json();",
+									"    if (data.token) {",
+									"        pm.collectionVariables.set('token', data.token);",
+									"        console.log('JWT Token đã được lưu tự động:', data.token);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"login"
+							]
+						}
+					}
+				},
+				{
+					"name": "Register User Mới",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"tenant_new\",\n  \"fullName\": \"Trần Thị Mới\",\n  \"email\": \"tenant_new@gmail.com\",\n  \"password\": \"123456\",\n  \"phone\": \"0988776655\",\n  \"role\": \"Tenant\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"register"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Users",
+			"item": [
+				{
+					"name": "Get All Users (Pagination + Filter Role)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users?pageNumber=1&pageSize=10&role=Tenant",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users"
+							],
+							"query": [
+								{
+									"key": "pageNumber",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "10"
+								},
+								{
+									"key": "role",
+									"value": "Tenant"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get User By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"fullName\": \"Quản Trị Viên Hệ Thống\",\n  \"email\": \"admin@rental.com\",\n  \"phone\": \"0900000001\",\n  \"role\": \"Admin\",\n  \"password\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete User (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/6",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"6"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Houses",
+			"item": [
+				{
+					"name": "Get Houses (Pagination + Search + Filter + Sort)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/houses?pageNumber=1&pageSize=5&searchTerm=căn hộ&status=Available&minPrice=1000000&maxPrice=20000000&bedrooms=1&sortBy=price&isDescending=false",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"houses"
+							],
+							"query": [
+								{
+									"key": "pageNumber",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "5"
+								},
+								{
+									"key": "searchTerm",
+									"value": "căn hộ"
+								},
+								{
+									"key": "status",
+									"value": "Available"
+								},
+								{
+									"key": "minPrice",
+									"value": "1000000"
+								},
+								{
+									"key": "maxPrice",
+									"value": "20000000"
+								},
+								{
+									"key": "bedrooms",
+									"value": "1"
+								},
+								{
+									"key": "sortBy",
+									"value": "price"
+								},
+								{
+									"key": "isDescending",
+									"value": "false"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get House By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/houses/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"houses",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create House (Owner / Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Căn hộ Studio trung tâm Quận 3\",\n  \"description\": \"Phòng mới xây 100%, ban công view đẹp, thoáng mát, full nội thất cao cấp.\",\n  \"address\": \"Quận 3, TP. Hồ Chí Minh\",\n  \"price\": 6500000,\n  \"area\": 35,\n  \"bedrooms\": 1,\n  \"imageUrl\": \"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267\",\n  \"status\": \"Available\",\n  \"ownerId\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/houses",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"houses"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update House (Owner / Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Căn hộ Studio trung tâm Quận 3 (Giảm giá)\",\n  \"description\": \"Phòng mới xây 100%, ban công view đẹp, thoáng mát, full nội thất cao cấp.\",\n  \"address\": \"Quận 3, TP. Hồ Chí Minh\",\n  \"price\": 6000000,\n  \"area\": 35,\n  \"bedrooms\": 1,\n  \"imageUrl\": \"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267\",\n  \"status\": \"Available\",\n  \"ownerId\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/houses/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"houses",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete House (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/houses/4",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"houses",
+								"4"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Bookings",
+			"item": [
+				{
+					"name": "Get All Bookings (Lọc Status)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings?status=Pending",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"bookings"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Booking By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"bookings",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Booking (Hợp lệ)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": 4,\n  \"houseId\": 1,\n  \"startDate\": \"2026-12-01T00:00:00Z\",\n  \"endDate\": \"2027-06-01T00:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"bookings"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Booking (Lỗi StartDate >= EndDate -> 400)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": 4,\n  \"houseId\": 1,\n  \"startDate\": \"2027-01-01T00:00:00Z\",\n  \"endDate\": \"2026-01-01T00:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"bookings"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Booking",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": 4,\n  \"houseId\": 1,\n  \"startDate\": \"2026-12-05T00:00:00Z\",\n  \"endDate\": \"2027-06-05T00:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"bookings",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Booking",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings/3",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"bookings",
+								"3"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Contracts",
+			"item": [
+				{
+					"name": "Get All Contracts (Admin / Owner)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/contracts?status=Active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"contracts"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "Active"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Contract By Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/contracts/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"contracts",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Contract By BookingId",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/contracts/booking/2",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"contracts",
+								"booking",
+								"2"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Contract (Admin / Owner)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookingId\": 1,\n  \"monthlyRent\": 4500000,\n  \"deposit\": 9000000,\n  \"startDate\": \"2026-10-01T00:00:00Z\",\n  \"endDate\": \"2027-04-01T00:00:00Z\",\n  \"status\": \"Active\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contracts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"contracts"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Contract (Admin / Owner)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bookingId\": 1,\n  \"monthlyRent\": 4200000,\n  \"deposit\": 8400000,\n  \"startDate\": \"2026-10-01T00:00:00Z\",\n  \"endDate\": \"2027-04-01T00:00:00Z\",\n  \"status\": \"Active\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/contracts/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"contracts",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Contract (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/contracts/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"contracts",
+								"1"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Files",
+			"item": [
+				{
+					"name": "Upload File (multipart/form-data)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/files/upload",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"files",
+								"upload"
+							]
+						}
+					}
+				},
+				{
+					"name": "Download File By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/files/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"files",
+								"1"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Errors (Test Global Exception Middleware)",
+			"item": [
+				{
+					"name": "Test 400 Bad Request",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/errors/bad-request",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"errors",
+								"bad-request"
+							]
+						}
+					}
+				},
+				{
+					"name": "Test 401 Unauthorized",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/errors/unauthorized",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"errors",
+								"unauthorized"
+							]
+						}
+					}
+				},
+				{
+					"name": "Test 404 Not Found",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/errors/not-found",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"errors",
+								"not-found"
+							]
+						}
+					}
+				},
+				{
+					"name": "Test 500 Server Error",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/errors/server",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"errors",
+								"server"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://localhost:7255",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

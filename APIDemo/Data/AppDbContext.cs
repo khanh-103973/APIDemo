@@ -5,8 +5,8 @@ namespace APIDemo.Data
 {
     public class AppDbContext : DbContext
     {
-        // Nhan cau hinh ket noi database tu Program.cs.
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        public AppDbContext(DbContextOptions<AppDbContext> options)
+            : base(options)
         {
         }
 
@@ -14,51 +14,48 @@ namespace APIDemo.Data
         public DbSet<House> Houses { get; set; } = null!;
         public DbSet<Booking> Bookings { get; set; } = null!;
         public DbSet<Contract> Contracts { get; set; } = null!;
-        public DbSet<Product> Products { get; set; } = null!;
-        public DbSet<Category> Categories { get; set; } = null!;
         public DbSet<StoredFile> StoredFiles { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            // 1. Chỉ mục Unique cho Username và Email
             modelBuilder.Entity<User>()
-                .HasIndex(user => user.Username)
+                .HasIndex(u => u.Username)
                 .IsUnique();
 
             modelBuilder.Entity<User>()
-                .HasIndex(user => user.Email)
+                .HasIndex(u => u.Email)
                 .IsUnique();
 
+            // 2. Quan hệ Nhà - Chủ nhà (Owner - User)
             modelBuilder.Entity<House>()
-                .HasOne(house => house.Owner)
-                .WithMany(user => user.Houses)
-                .HasForeignKey(house => house.OwnerId)
+                .HasOne(h => h.Owner)
+                .WithMany(u => u.Houses)
+                .HasForeignKey(h => h.OwnerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // 3. Quan hệ Đặt phòng - Người dùng (Booking - User)
             modelBuilder.Entity<Booking>()
-                .HasOne(booking => booking.User)
-                .WithMany(user => user.Bookings)
-                .HasForeignKey(booking => booking.UserId)
+                .HasOne(b => b.User)
+                .WithMany(u => u.Bookings)
+                .HasForeignKey(b => b.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // 4. Quan hệ Đặt phòng - Nhà (Booking - House)
             modelBuilder.Entity<Booking>()
-                .HasOne(booking => booking.House)
-                .WithMany(house => house.Bookings)
-                .HasForeignKey(booking => booking.HouseId)
+                .HasOne(b => b.House)
+                .WithMany(h => h.Bookings)
+                .HasForeignKey(b => b.HouseId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // 5. Quan hệ 1-1: Hợp đồng - Đặt phòng (Contract - Booking)
             modelBuilder.Entity<Contract>()
-                .HasOne(contract => contract.Booking)
-                .WithOne(booking => booking.Contract)
-                .HasForeignKey<Contract>(contract => contract.BookingId)
+                .HasOne(c => c.Booking)
+                .WithOne(b => b.Contract)
+                .HasForeignKey<Contract>(c => c.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<Product>()
-                .HasOne(product => product.Category)
-                .WithMany(category => category.Products)
-                .HasForeignKey(product => product.CategoryId)
-                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

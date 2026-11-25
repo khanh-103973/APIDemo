@@ -14,6 +14,7 @@ namespace APIDemo.Models
         [MaxLength(50)]
         public string Username { get; set; } = string.Empty;
 
+        [Required]
         [MaxLength(100)]
         public string FullName { get; set; } = string.Empty;
 
@@ -22,13 +23,13 @@ namespace APIDemo.Models
         [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
-        [MaxLength(100)]
-        public string Password { get; set; } = string.Empty;
+        [Required]
+        public byte[] PasswordHash { get; set; } = Array.Empty<byte>();
 
-        public byte[]? PasswordHash { get; set; }
+        [Required]
+        public byte[] PasswordSalt { get; set; } = Array.Empty<byte>();
 
-        public byte[]? PasswordSalt { get; set; }
-
+        [Required]
         [MaxLength(15)]
         [Phone]
         public string Phone { get; set; } = string.Empty;

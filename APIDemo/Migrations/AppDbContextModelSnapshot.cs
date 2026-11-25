@@ -56,24 +56,6 @@ namespace APIDemo.Migrations
                     b.ToTable("Bookings");
                 });
 
-            modelBuilder.Entity("APIDemo.Models.Category", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Categories");
-                });
-
             modelBuilder.Entity("APIDemo.Models.Contract", b =>
                 {
                     b.Property<int>("Id")
@@ -162,32 +144,6 @@ namespace APIDemo.Migrations
                     b.ToTable("Houses");
                 });
 
-            modelBuilder.Entity("APIDemo.Models.Product", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CategoryId");
-
-                    b.ToTable("Products");
-                });
-
             modelBuilder.Entity("APIDemo.Models.StoredFile", b =>
                 {
                     b.Property<int>("Id")
@@ -201,6 +157,10 @@ namespace APIDemo.Migrations
                         .HasColumnType("varbinary(max)");
 
                     b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -248,15 +208,12 @@ namespace APIDemo.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Password")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<byte[]>("PasswordHash")
+                        .IsRequired()
                         .HasColumnType("varbinary(max)");
 
                     b.Property<byte[]>("PasswordSalt")
+                        .IsRequired()
                         .HasColumnType("varbinary(max)");
 
                     b.Property<string>("Phone")
@@ -326,25 +283,9 @@ namespace APIDemo.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("APIDemo.Models.Product", b =>
-                {
-                    b.HasOne("APIDemo.Models.Category", "Category")
-                        .WithMany("Products")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Category");
-                });
-
             modelBuilder.Entity("APIDemo.Models.Booking", b =>
                 {
                     b.Navigation("Contract");
-                });
-
-            modelBuilder.Entity("APIDemo.Models.Category", b =>
-                {
-                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("APIDemo.Models.House", b =>
